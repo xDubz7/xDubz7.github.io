@@ -361,7 +361,7 @@ main{padding:12px 12px calc(120px + var(--sab))}
     <button data-rate="0.8" class="eqchip">0.8×</button><button data-rate="1" class="eqchip on">1×</button><button data-rate="1.1" class="eqchip">1.1×</button><button data-rate="1.25" class="eqchip">1.25×</button><button data-rate="lock" class="eqchip on">Pitch lock</button>
   </div></div>
   <div class="eqrow prow hidden" id="row-cues"><div class="eqchips" id="cue-chips"></div><button class="eqchip" id="cue-add">+ Cue</button></div>
-  <div class="eqrow prow hidden" id="row-wave"><div class="eqchips" id="wave-chips"><button data-wave="bands" class="eqchip on">3-Band scroll</button><button data-wave="led" class="eqchip">LED bars</button><button data-wave="curve" class="eqchip">Curve</button><button data-wave="radial" class="eqchip">Radial</button></div></div>
+  <div class="eqrow prow hidden" id="row-wave"><div class="eqchips" id="wave-chips"><button data-wave="bands" class="eqchip on">3-Band scroll</button><button data-wave="led" class="eqchip">LED bars</button><button data-wave="curve" class="eqchip">Curve</button></div></div>
   <div class="eqrow prow hidden" id="row-dance"><div class="eqchips" id="dance-chips">
     <button class="eqchip on" id="dancer-toggle">Dancer on</button>
     <button class="eqchip" id="bpm-down">−</button>
@@ -526,7 +526,7 @@ async function loadMeta() {
     state.pitchLock = v.pitchLock !== false;
     state.dancer = v.dancer !== false;
     state.seenBuild = v.seenBuild || null;
-    state.waveStyle = v.waveStyle || 'bands';
+    state.waveStyle = ['bands', 'led', 'curve'].includes(v.waveStyle) ? v.waveStyle : 'bands';
     state.currentId = v.currentId || null;
   } catch (e) { /* first run */ }
 }
@@ -569,6 +569,10 @@ document.addEventListener('pointerdown', () => {
    repeats for that version. Add an entry here for every release
    that ships user-visible changes. */
 const CHANGELOG = {
+  '5.6.2': [
+    'Wave styles: mid and high bands lifted, so LED bars and Curve move more where vocals and leads live',
+    'Radial style removed — it took too much room',
+  ],
   '5.6.1': [
     'Fixed: LED, Curve and Radial wave styles drew a blank strip — they now show the frequency data as intended',
     'The 3-Band scroll style was not affected',
@@ -839,7 +843,7 @@ async function computeFinePeaks(r, info, t0, t1, buckets) {
   const a1 = 1 - Math.exp((-2 * Math.PI * 250) / sr);
   const a2 = 1 - Math.exp((-2 * Math.PI * 4000) / sr);
   let lp1 = 0, lp2 = 0;
-  /* Frequency bands for the LED / Curve / Radial strip styles: a
+  /* Frequency bands for the LED / Curve strip styles: a
      2048-pt FFT over a rolling mono buffer, one slice every ~0.1 s,
      24 log-spaced bands (40 Hz-16 kHz). Rides the same single decode
      pass — no extra file reads, no live audio routing. */
@@ -1174,7 +1178,7 @@ function render() {
  * variables and the waveform via peakColor(). Saved between launches. */
 const THEMES = ['green', 'miku', 'sonic', 'shadow', 'space', 'soundcloud', 'cdj', 'vapor', 'vinyl'];
 const THEME_NAMES = { green: 'Localify', miku: 'Hatsune Miku', sonic: 'Sonic', shadow: 'Shadow', space: 'Space', soundcloud: 'SoundCloud', cdj: 'CDJ', vapor: 'Vaporwave', vinyl: 'Vinyl' };
-const BUILD = '5.6.1';
+const BUILD = '5.6.2';
 let peakColorCache = {};
 function applyTheme(name, save = true) {
   state.theme = THEMES.includes(name) ? name : 'green';
@@ -1404,7 +1408,7 @@ function drawScroll(s, f, disp) {
   const fine = (c.id === s.id && c.fine && c.fine.peaks && ct >= c.start && ct <= c.start + c.dur) ? c.fine : null;
   const mid = H / 2, halfH = mid - 3 * dpr;
   ctx.clearRect(0, 0, W, H);
-  /* Choosable strip styles (Wave tab, 5.6): LED / Curve / Radial draw
+  /* Choosable strip styles (Wave tab, 5.6; Radial removed 5.6.2): LED / Curve draw
      the frequency bands AT the playhead from the sampler's FFT slices.
      The original scrolling 3-band view below is untouched and stays
      the default; the new styles fall back to it for files with no band
@@ -1489,7 +1493,15 @@ function drawSpecStyle(ctx, W, H, dpr, fine, c, ct) {
   const fr = Math.min(1, Math.max(0, pos - i0));
   for (let b = 0; b < NB; b++) {
     const raw = spec.data[i0 * NB + b] * (1 - fr) + spec.data[i1 * NB + b] * fr;
-    const target = Math.min(1, Math.sqrt(Math.max(0, raw)) * 1.25);
+    /* Display lift (5.6.2): band values are normalised against the
+       window's loudest band — in bass music always the sub — so mids
+       and highs read tiny on a flat scale. Analysers use a dB-style
+       tilt: progressively amplify higher bands before the sqrt gain.
+       Display only; the stored band data is unchanged. Tilt grows as
+       (f / 40 Hz)^0.65, capped at x24 — about x2 at 100 Hz, x8 at
+       1 kHz, x24 at 8 kHz. */
+    const tilt = Math.min(24, Math.pow(Math.pow(400, (b + 0.5) / NB), 0.65));
+    const target = Math.min(1, Math.sqrt(Math.max(0, raw) * tilt) * 1.25);
     const k = target > specSm[b] ? 0.5 : 0.18;
     specSm[b] += (target - specSm[b]) * k;
   }
@@ -1520,30 +1532,6 @@ function drawSpecStyle(ctx, W, H, dpr, fine, c, ct) {
     ctx.strokeStyle = acc; ctx.lineWidth = 2 * dpr; ctx.stroke();
     ctx.lineTo(W, H); ctx.lineTo(0, H); ctx.closePath();
     ctx.globalAlpha = 0.30; ctx.fillStyle = acc; ctx.fill(); ctx.globalAlpha = 1;
-  } else if (style === 'radial') {
-    const cx = W / 2, cy = H / 2;
-    const r0 = H * 0.17, maxLen = H * 0.315;
-    ctx.beginPath(); ctx.arc(cx, cy, Math.max(6 * dpr, r0 - 4 * dpr), 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.fill();
-    ctx.strokeStyle = 'rgba(255,255,255,.14)'; ctx.lineWidth = 1.2 * dpr; ctx.stroke();
-    const n = 48, rot = performance.now() / 1000 * 0.15;
-    ctx.lineCap = 'round';
-    const bandAt = (x) => {
-      const i = Math.max(0, Math.min(NB - 2, Math.floor(x)));
-      const f2 = Math.min(1, Math.max(0, x - i));
-      return specSm[i] * (1 - f2) + specSm[i + 1] * f2;
-    };
-    for (let k = 0; k < n; k++) {
-      const v = bandAt((k / (n - 1)) * (NB - 1));
-      const a = rot + (k / n) * Math.PI * 2;
-      const r1 = r0 + Math.max(0.03, v) * maxLen;
-      ctx.beginPath();
-      ctx.moveTo(cx + Math.cos(a) * r0, cy + Math.sin(a) * r0);
-      ctx.lineTo(cx + Math.cos(a) * r1, cy + Math.sin(a) * r1);
-      ctx.strokeStyle = bandColorAt(pal, v);
-      ctx.lineWidth = 3 * dpr;
-      ctx.stroke();
-    }
   }
 }
 function drawWave() {
@@ -2031,10 +2019,13 @@ $('#p-tabs').addEventListener('click', (e) => {
   $('#row-dance').classList.toggle('hidden', k !== 'dance');
   $('#row-wave').classList.toggle('hidden', k !== 'wave');
 });
-const WAVE_HEIGHTS = { bands: '54px', led: '64px', curve: '64px', radial: '200px' };
+const WAVE_HEIGHTS = { bands: '54px', led: '64px', curve: '64px' };
 let waveHeightApplied = '';
 function applyWaveStyle() {
-  const st = state.waveStyle || 'bands';
+  /* A saved style can outlive the style itself (Radial was removed in
+     5.6.2) — anything unknown falls back to the 3-Band scroll. */
+  let st = state.waveStyle || 'bands';
+  if (st !== 'bands' && st !== 'led' && st !== 'curve') { st = 'bands'; state.waveStyle = 'bands'; }
   document.querySelectorAll('#wave-chips [data-wave]').forEach((ch) =>
     ch.classList.toggle('on', ch.dataset.wave === st));
   const h = WAVE_HEIGHTS[st] || '54px';
