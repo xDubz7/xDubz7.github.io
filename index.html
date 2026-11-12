@@ -114,6 +114,46 @@ main{padding:12px 12px calc(120px + var(--sab))}
 .volrow{display:flex;align-items:center;gap:10px;margin-top:8px;color:var(--dim);font-size:14px}
 .volrow input{flex:1;accent-color:var(--green)}
 
+/* ---------- icons (SVG, no emoji buttons) ---------- */
+.pbtn svg{display:block;width:24px;height:24px}
+.pbtn.main svg{width:30px;height:30px}
+#mini .pbtn svg{width:22px;height:22px}
+#mini .prog{position:absolute;top:0;left:14px;right:14px;height:3px;border-radius:99px;background:var(--line);overflow:hidden}
+#mini .prog i{display:block;height:100%;width:0;background:var(--green)}
+#mini{overflow:hidden}
+.song .fav svg,.song .dots svg{display:block;width:22px;height:22px}
+.song .art svg{width:22px;height:22px}
+#mini .art svg{width:20px;height:20px}
+#player .part svg{width:118px;height:118px}
+#player .close svg{display:block;width:26px;height:26px}
+.empty .big svg{width:52px;height:52px;color:var(--green)}
+.chip svg{width:13px;height:13px;vertical-align:-2px;margin-right:3px}
+.vic{display:flex}.vic svg{display:block;width:20px;height:20px}
+
+/* ---------- playing-row EQ bars ---------- */
+.eqbars{display:flex;align-items:flex-end;gap:2.5px;height:16px}
+.eqbars i{display:block;width:3.5px;height:100%;background:var(--green);border-radius:2px;
+  transform-origin:bottom;animation:eqb .9s ease-in-out infinite}
+.eqbars i:nth-child(2){animation-delay:.22s}.eqbars i:nth-child(3){animation-delay:.45s}.eqbars i:nth-child(4){animation-delay:.12s}
+.eqbars.still i{animation-play-state:paused;transform:scaleY(.35)}
+@keyframes eqb{0%,100%{transform:scaleY(.3)}50%{transform:scaleY(1)}}
+
+/* ---------- waveform seek ---------- */
+#p-wave{flex:1;height:46px;touch-action:none;cursor:pointer}
+
+/* ---------- player extras: sleep + EQ ---------- */
+.eqrow{display:flex;align-items:center;gap:10px;margin-top:12px}
+.eqlab{color:var(--dim);font-size:13px;font-weight:700;letter-spacing:.06em}
+.eqchips{display:flex;gap:8px;flex-wrap:wrap}
+.eqchip{padding:6px 13px;border-radius:999px;background:var(--panel2);border:1px solid var(--line);
+  color:var(--dim);font-size:13px}
+.eqchip.on{background:var(--green);border-color:var(--green);color:#04140a;font-weight:700}
+.extrarow{display:flex;justify-content:center;margin-top:12px}
+.xbtn{display:flex;align-items:center;gap:7px;padding:8px 16px;border-radius:999px;
+  background:var(--panel2);border:1px solid var(--line);color:var(--dim);font-size:13.5px}
+.xbtn svg{display:block;width:18px;height:18px}
+.xbtn.on{color:var(--green);border-color:var(--green)}
+
 /* ---------- sheet / toast ---------- */
 #sheetWrap{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.55);display:flex;align-items:flex-end}
 #sheet{background:var(--panel);width:100%;border-radius:18px 18px 0 0;padding:14px 16px calc(16px + var(--sab))}
@@ -164,35 +204,40 @@ main{padding:12px 12px calc(120px + var(--sab))}
 <main id="main"></main>
 
 <div id="mini" class="hidden">
-  <div class="art" id="mini-art">♪</div>
+  <div class="prog"><i id="mini-prog-fill"></i></div>
+  <div class="art" id="mini-art"></div>
   <div class="meta" id="mini-meta">
     <div class="title" id="mini-title">Nothing playing</div>
     <div class="sub" id="mini-sub">Pick a song to start</div>
   </div>
-  <button class="pbtn" id="mini-prev" aria-label="Previous">⏮</button>
-  <button class="pbtn main" id="mini-play" aria-label="Play or pause">▶</button>
-  <button class="pbtn" id="mini-next" aria-label="Next">⏭</button>
+  <button class="pbtn" id="mini-prev" aria-label="Previous"></button>
+  <button class="pbtn main" id="mini-play" aria-label="Play or pause"></button>
+  <button class="pbtn" id="mini-next" aria-label="Next"></button>
 </div>
 
 <div id="player" class="hidden">
-  <button class="close" id="p-close" aria-label="Close player">⌄</button>
-  <div class="part" id="p-art">♪</div>
+  <button class="close" id="p-close" aria-label="Close player"></button>
+  <div class="part" id="p-art"></div>
   <h2 id="p-title">Nothing playing</h2>
   <div class="artist" id="p-artist"></div>
   <div class="src" id="p-src">On this device</div>
   <div class="seekrow">
     <span id="p-cur">0:00</span>
-    <input id="p-seek" type="range" min="0" max="1000" value="0">
+    <canvas id="p-wave"></canvas>
     <span id="p-dur">0:00</span>
   </div>
   <div class="controls">
-    <button class="pbtn" id="p-shuffle" aria-label="Shuffle">🔀</button>
-    <button class="pbtn" id="p-prev" aria-label="Previous">⏮</button>
-    <button class="pbtn main" id="p-play" aria-label="Play or pause">▶</button>
-    <button class="pbtn" id="p-next" aria-label="Next">⏭</button>
-    <button class="pbtn" id="p-repeat" aria-label="Repeat">🔁</button>
+    <button class="pbtn" id="p-shuffle" aria-label="Shuffle"></button>
+    <button class="pbtn" id="p-prev" aria-label="Previous"></button>
+    <button class="pbtn main" id="p-play" aria-label="Play or pause"></button>
+    <button class="pbtn" id="p-next" aria-label="Next"></button>
+    <button class="pbtn" id="p-repeat" aria-label="Repeat"></button>
   </div>
-  <div class="volrow"><span>🔈</span><input id="p-vol" type="range" min="0" max="100" value="90"><span>🔊</span></div>
+  <div class="volrow"><span class="vic" id="vol-lo"></span><input id="p-vol" type="range" min="0" max="100" value="90"><span class="vic" id="vol-hi"></span></div>
+  <div class="eqrow"><span class="eqlab">EQ</span><div class="eqchips" id="eq-chips">
+    <button data-eq="flat" class="eqchip on">Flat</button><button data-eq="bass" class="eqchip">Bass</button><button data-eq="treble" class="eqchip">Treble</button><button data-eq="vocal" class="eqchip">Vocal</button>
+  </div></div>
+  <div class="extrarow"><button class="xbtn" id="p-sleep"><span id="sleep-label">Sleep off</span></button></div>
 </div>
 
 <div id="plWrap" class="hidden"><div id="plsheet">
@@ -246,6 +291,28 @@ const AUDIO_EXT = /\.(mp3|flac|wav|ogg|oga|m4a|aac|opus|wma|webm|aif|aiff)$/i;
 const $ = (s) => document.querySelector(s);
 const audio = $('#audio');
 
+/* ================= SVG icons (the old build's buttons were emoji) ================= */
+const ICON_INNER = {
+  play: '<path d="M8 5v14l11-7z"/>',
+  pause: '<path d="M6 5h4v14H6zM14 5h4v14h-4z"/>',
+  next: '<path d="M6 18l8.5-6L6 6v12zM16 6h2v12h-2z"/>',
+  prev: '<path d="M6 6h2v12H6zM18 6l-8.5 6L18 18V6z"/>',
+  shuffle: '<path d="M10.59 9.17 5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/>',
+  repeat: '<path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/>',
+  repeatOne: '<path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/><text x="13.4" y="14.6" font-size="7.5" font-weight="700" text-anchor="middle" fill="currentColor">1</text>',
+  heart: '<path d="M16.5 3c-1.74 0-3.41.81-4.5 2.09C10.91 3.81 9.24 3 7.5 3 4.42 3 2 5.42 2 8.5c0 3.78 3.4 6.86 8.55 11.54L12 21.35l1.45-1.32C18.6 15.36 22 12.28 22 8.5 22 5.42 19.58 3 16.5 3zm-4.4 15.55-.1.1-.1-.1C7.14 14.24 4 11.39 4 8.5 4 6.5 5.5 5 7.5 5c1.54 0 3.04.99 3.57 2.36h1.87C13.46 5.99 14.96 5 16.5 5c2 0 3.5 1.5 3.5 3.5 0 2.89-3.14 5.74-7.9 9.55z"/>',
+  heartFill: '<path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>',
+  dots: '<path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>',
+  chevD: '<path d="M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/>',
+  volLow: '<path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3A4.5 4.5 0 0 0 14 7.97v8.05A4.5 4.5 0 0 0 16.5 12z"/>',
+  volHigh: '<path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>',
+  note: '<path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>',
+  moon: '<path d="M12 3a9 9 0 1 0 9 9c0-.46-.04-.92-.1-1.36a5.39 5.39 0 0 1-4.4 2.26 5.5 5.5 0 0 1-5.5-5.5c0-1.81.89-3.42 2.26-4.4C12.92 3.04 12.46 3 12 3z"/>',
+};
+function icon(name) {
+  return '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">' + (ICON_INNER[name] || '') + '</svg>';
+}
+
 /* ================= storage (metadata + small files only) ================= */
 const DB = (() => {
   let p = null;
@@ -287,6 +354,7 @@ const state = {
   query: '',
   queue: [], qIndex: -1,
   shuffle: false, repeat: 'off', // off | all | one
+  volume: 0.9, eq: 'flat',
   importing: null,
   currentId: null,
 };
@@ -300,7 +368,7 @@ function saveMeta() {
     favorites: [...state.favorites],
     playlists: state.playlists,
     sort: state.sort, shuffle: state.shuffle, repeat: state.repeat,
-    volume: audio.volume, currentId: state.currentId,
+    volume: state.volume, eq: state.eq, currentId: state.currentId,
   }}).catch(() => {});
 }
 async function loadMeta() {
@@ -311,7 +379,8 @@ async function loadMeta() {
     state.playlists = Array.isArray(v.playlists) ? v.playlists : [];
     state.sort = v.sort || 'title';
     state.shuffle = !!v.shuffle; state.repeat = v.repeat || 'off';
-    if (typeof v.volume === 'number') { audio.volume = v.volume; $('#p-vol').value = Math.round(v.volume * 100); }
+    state.eq = v.eq || 'flat';
+    if (typeof v.volume === 'number') { state.volume = v.volume; audio.volume = v.volume; $('#p-vol').value = Math.round(v.volume * 100); }
     state.currentId = v.currentId || null;
   } catch (e) { /* first run */ }
 }
@@ -391,7 +460,9 @@ async function parseWav(r) {
     } else if (id === 'fmt ') {
       const b = await r.read(pos + 8, Math.min(len, 40));
       if (b.length >= 16) {
+        res.audioFormat = u16le(b, 0); res.channels = u16le(b, 2);
         sampleRate = u32le(b, 4); byteRate = u32le(b, 8); blockAlign = u16le(b, 12);
+        res.bitsPerSample = u16le(b, 14); res.blockAlign = blockAlign;
       }
     } else if (id === 'data') {
       dataStart = pos + 8;
@@ -420,7 +491,64 @@ async function parseWav(r) {
   }
   if (!byteRate && sampleRate && blockAlign) byteRate = sampleRate * blockAlign;
   res.duration = byteRate && dataLen ? dataLen / byteRate : 0;
+  res.dataStart = dataStart; res.dataLen = dataLen;
   return res;
+}
+
+/* Waveform peaks for WAVs WITHOUT decoding the file: WAV data is raw PCM,
+   so a peak per bucket comes from sampling a small window of bytes at each
+   bucket position (a few KB read per bucket, never the whole file — the
+   1.5 GB case reads ~15 MB total in slices). Peaks are 0..1 floats. */
+async function computeWavPeaks(r, info, buckets) {
+  buckets = buckets || 240;
+  if (!info || !info.dataStart || !info.dataLen || !info.blockAlign) return null;
+  const bits = info.bitsPerSample || 0;
+  const fmt = info.audioFormat || 1;
+  if (!((fmt === 1 && (bits === 8 || bits === 16 || bits === 24 || bits === 32)) || (fmt === 3 && bits === 32))) return null;
+  const bps = bits / 8;
+  const frames = Math.floor(info.dataLen / info.blockAlign);
+  if (frames <= 0) return null;
+  const perBucket = frames / buckets;
+  const winFrames = Math.min(4096, Math.max(256, Math.floor(perBucket)));
+  const peaks = new Array(buckets).fill(0);
+  const dv = (buf) => new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+  /* Three sample windows per bucket (start / middle / end) so a short loud
+     passage anywhere in the bucket registers in its peak. */
+  for (let b = 0; b < buckets; b++) {
+    const bucketStart = Math.floor(b * perBucket);
+    const offsets = [0, Math.floor(perBucket / 2), Math.max(0, Math.floor(perBucket) - winFrames)];
+    let peak = 0;
+    for (const off of offsets) {
+      const startFrame = bucketStart + off;
+      if (startFrame >= frames) break;
+      const pos = info.dataStart + startFrame * info.blockAlign;
+      const len = Math.min(winFrames * info.blockAlign, info.dataLen - startFrame * info.blockAlign);
+      if (len <= 0) continue;
+      const buf = await r.read(pos, len);
+      const view = dv(buf);
+      for (let o = 0; o + bps <= buf.length; o += bps) {
+        let v = 0;
+        if (fmt === 3) v = Math.abs(view.getFloat32(o, true));
+        else if (bits === 16) v = Math.abs(view.getInt16(o, true)) / 32768;
+        else if (bits === 8) v = Math.abs(buf[o] - 128) / 128;
+        else if (bits === 24) { let x = buf[o] | (buf[o + 1] << 8) | (buf[o + 2] << 16); if (x & 0x800000) x -= 0x1000000; v = Math.abs(x) / 8388608; }
+        else if (bits === 32) v = Math.abs(view.getInt32(o, true)) / 2147483648;
+        if (v > peak) peak = v;
+      }
+      if (peak >= 0.999) break;
+    }
+    peaks[b] = Math.round(Math.min(1, peak) * 1000) / 1000;
+    if (b % 40 === 39) await tick();
+  }
+  return peaks;
+}
+
+async function peaksForFile(file) {
+  try {
+    const r = new SliceReader(file);
+    const info = await parseWav(r);
+    return await computeWavPeaks(r, info);
+  } catch (e) { return null; }
 }
 
 /* Minimal ID3v2 text frames (title/artist/album). No picture extraction
@@ -485,7 +613,12 @@ async function readTags(file) {
   const lower = file.name.toLowerCase();
   let info = {};
   try {
-    if (lower.endsWith('.wav') || lower.endsWith('.aif') || lower.endsWith('.aiff')) info = await parseWav(r);
+    if (lower.endsWith('.wav') || lower.endsWith('.aif') || lower.endsWith('.aiff')) {
+      info = await parseWav(r);
+      if (lower.endsWith('.wav') && info.dataStart) {
+        try { info.peaks = await computeWavPeaks(r, info); } catch (e) { /* peaks are decorative */ }
+      }
+    }
     else if (lower.endsWith('.flac')) info = await parseFlac(r);
     else if (lower.endsWith('.mp3')) info = await parseId3At(r, 0);
   } catch (e) { info = {}; }
@@ -496,6 +629,7 @@ async function readTags(file) {
     artist: (info.artist || '').trim() || 'Unknown Artist',
     album: (info.album || '').trim() || '',
     duration: Math.round((duration || 0) * 10) / 10,
+    peaks: info.peaks || null,
   };
 }
 
@@ -536,7 +670,7 @@ async function importOneFile(file) {
   const record = {
     id, title: info.title, artist: info.artist, album: info.album,
     duration: info.duration, size: file.size, mime: file.type || '',
-    fileName: file.name, addedAt: Date.now(),
+    fileName: file.name, addedAt: Date.now(), peaks: info.peaks || null,
     persisted: false, sessionOnly: large, needsFile: false,
   };
   if (!large) {
@@ -604,11 +738,11 @@ function visibleSongs() {
 }
 
 function renderChips() {
-  const chips = [{ k: 'all', label: 'All songs' }, { k: 'fav', label: '♥ Favorites' }];
+  const chips = [{ k: 'all', label: 'All songs' }, { k: 'fav', label: 'Favorites', ic: 'heartFill' }];
   state.playlists.forEach((pl, i) => chips.push({ k: 'pl:' + i, label: pl.name }));
   chips.push({ k: '__newpl', label: '+ Playlist' });
   $('#chips').innerHTML = chips.map((c) =>
-    `<button class="chip ${state.filter === c.k ? 'on' : ''}" data-chip="${esc(c.k)}">${esc(c.label)}</button>`).join('');
+    `<button class="chip ${state.filter === c.k ? 'on' : ''}" data-chip="${esc(c.k)}">${c.ic ? icon(c.ic) : ''}${esc(c.label)}</button>`).join('');
 }
 
 function render() {
@@ -616,7 +750,7 @@ function render() {
   const main = $('#main');
   const list = visibleSongs();
   if (!state.songs.length) {
-    main.innerHTML = `<div class="empty"><div class="big">🎵</div>
+    main.innerHTML = `<div class="empty"><div class="big">${icon('note')}</div>
       <b>Your library is empty</b><br>Tap <b>+ Add music</b> and pick songs from Files
       (MP3, FLAC, WAV, M4A…). They play right here — offline, no account, no YouTube.
       <div class="note"><b>Big WAVs welcome:</b> files over ${fmtSize(PERSIST_LIMIT)} (your 600 MB / 1.5 GB ones)
@@ -632,16 +766,81 @@ function render() {
     const playing = s.id === state.currentId;
     const badge = s.needsFile ? `<span class="badge off">re-add file</span>`
       : s.sessionOnly ? `<span class="badge">session only · ${fmtSize(s.size)}</span>` : '';
+    const art = playing
+      ? `<span class="eqbars${audio.paused ? ' still' : ''}"><i></i><i></i><i></i><i></i></span>`
+      : icon('note');
     return `<div class="song ${playing ? 'playing' : ''}" data-play="${esc(s.id)}">
-      <div class="art">${playing ? '▶' : '♪'}</div>
+      <div class="art">${art}</div>
       <div class="meta">
         <div class="title">${esc(s.title)}${badge}</div>
         <div class="sub">${esc(s.artist)}${s.album ? ' · ' + esc(s.album) : ''} · ${fmtTime(s.duration)} · ${fmtSize(s.size)}</div>
       </div>
-      <button class="fav ${state.favorites.has(s.id) ? 'on' : ''}" data-fav="${esc(s.id)}" aria-label="Favorite">${state.favorites.has(s.id) ? '♥' : '♡'}</button>
-      <button class="dots" data-menu="${esc(s.id)}" aria-label="More">⋯</button>
+      <button class="fav ${state.favorites.has(s.id) ? 'on' : ''}" data-fav="${esc(s.id)}" aria-label="Favorite">${icon(state.favorites.has(s.id) ? 'heartFill' : 'heart')}</button>
+      <button class="dots" data-menu="${esc(s.id)}" aria-label="More">${icon('dots')}</button>
     </div>`;
   }).join('');
+}
+
+/* ================= Web Audio graph: volume + EQ =================
+ * iOS Safari IGNORES audio.volume on a plain <audio> element (Apple leaves
+ * volume to the hardware buttons), which is why the old fader did nothing.
+ * Routing the SAME element through an AudioContext with a GainNode makes
+ * the fader real. This streams the file through the graph — it does NOT
+ * decode it into memory (no decodeAudioData), so big WAVs stay safe.
+ * The graph is created lazily inside a user gesture (tap), as iOS requires. */
+let AC = null, gainNode = null, eqNodes = [];
+const EQ_PRESETS = {
+  flat:   [0, 0, 0],
+  bass:   [8, 2, -2],
+  treble: [-2, 2, 8],
+  vocal:  [-3, 6, -2],
+};
+function ensureAudioGraph() {
+  if (AC) { if (AC.state === 'suspended') AC.resume().catch(() => {}); return true; }
+  try {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return false;
+    AC = new Ctx();
+    const src = AC.createMediaElementSource(audio);
+    const low = AC.createBiquadFilter();  low.type = 'lowshelf';  low.frequency.value = 200;
+    const mid = AC.createBiquadFilter();  mid.type = 'peaking';   mid.frequency.value = 1000; mid.Q.value = 0.6;
+    const high = AC.createBiquadFilter(); high.type = 'highshelf'; high.frequency.value = 4000;
+    gainNode = AC.createGain(); gainNode.gain.value = state.volume;
+    src.connect(low); low.connect(mid); mid.connect(high); high.connect(gainNode); gainNode.connect(AC.destination);
+    eqNodes = [low, mid, high];
+    audio.volume = 1; /* the gain node owns volume from here on */
+    applyEq(state.eq);
+    if (AC.state === 'suspended') AC.resume().catch(() => {});
+    return true;
+  } catch (e) { AC = null; return false; }
+}
+function setVolume(v) {
+  state.volume = v;
+  if (gainNode && AC) gainNode.gain.setTargetAtTime(v, AC.currentTime, 0.03);
+  else audio.volume = v;
+  saveMeta();
+}
+function applyEq(name) {
+  const vals = EQ_PRESETS[name] || EQ_PRESETS.flat;
+  if (eqNodes.length && AC) eqNodes.forEach((n, i) => n.gain.setTargetAtTime(vals[i], AC.currentTime, 0.05));
+  document.querySelectorAll('#eq-chips .eqchip').forEach((c) => c.classList.toggle('on', c.dataset.eq === name));
+}
+
+/* Songs imported before waveforms existed get theirs computed lazily
+   the first time they play (WAV only, sampled — see computeWavPeaks). */
+async function ensurePeaks(song, file) {
+  if (song.peaks || song._peaksBusy) return;
+  if (!/\.wav$/i.test(song.fileName || '')) return;
+  song._peaksBusy = true;
+  try {
+    const peaks = await peaksForFile(file);
+    if (peaks) {
+      song.peaks = peaks;
+      DB.put('tracks', song).catch(() => {});
+      if (song.id === state.currentId) drawWave();
+    }
+  } catch (e) { /* decorative only */ }
+  song._peaksBusy = false;
 }
 
 /* ================= playback (one element, one URL, no decoding) ================= */
@@ -672,7 +871,9 @@ async function playSong(id, queue) {
   currentUrl = URL.createObjectURL(file);   /* native streaming playback; the file is never copied into JS memory */
   state.currentId = id;
   audio.src = currentUrl;
+  if (AC && AC.state === 'suspended') AC.resume().catch(() => {});
   audio.play().catch(() => {});
+  ensurePeaks(song, file);
   saveMeta(); render(); updatePlayerUI();
 }
 
@@ -701,6 +902,95 @@ function prev() {
   playAt(state.qIndex - 1);
 }
 
+/* ================= waveform seek bar =================
+ * WAV songs draw their REAL waveform (peaks computed at import by sampling
+ * the PCM data — never decoded). Other formats get the original Localify
+ * look: a smooth ribbon generated from the song's id (every song keeps its
+ * own wave, like the Samsung-style player), flowing while it plays.
+ * Either way: tap or drag on the wave to seek. */
+function ribbonAmp(seedText, t, phase) {
+  let hsh = 2166136261;
+  const str = String(seedText || 'localify');
+  for (let i = 0; i < str.length; i++) { hsh ^= str.charCodeAt(i); hsh = Math.imul(hsh, 16777619); }
+  let seed = hsh >>> 0;
+  const rnd = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; };
+  const p1 = rnd() * 6.28, p2 = rnd() * 6.28, p3 = rnd() * 6.28;
+  const f1 = 2 + rnd() * 2, f2 = 5 + rnd() * 4, f3 = 11 + rnd() * 6;
+  const env = 0.35 + 0.65 * Math.abs(Math.sin(t * Math.PI * (0.6 + f1 * 0.12) + p1));
+  const w = Math.sin(t * f1 * 3.1 + p1 + phase) * 0.55 + Math.sin(t * f2 * 2.3 + p2 + phase * 1.5) * 0.3 + Math.sin(t * f3 * 1.7 + p3 + phase * 0.7) * 0.15;
+  return Math.max(0.12, Math.min(1, 0.5 + w * 0.5)) * env;
+}
+
+const waveCv = $('#p-wave');
+const wctx = waveCv.getContext('2d');
+function drawWave() {
+  const s = currentSong(); if (!s) return;
+  const rect = waveCv.getBoundingClientRect();
+  if (!rect.width) return;
+  const dpr = window.devicePixelRatio || 1;
+  const W = Math.round(rect.width * dpr), H = Math.round(rect.height * dpr);
+  if (waveCv.width !== W || waveCv.height !== H) { waveCv.width = W; waveCv.height = H; }
+  const ctx = wctx, mid = H / 2;
+  ctx.clearRect(0, 0, W, H);
+  const f = (isFinite(audio.duration) && audio.duration) ? Math.min(1, Math.max(0, audio.currentTime / audio.duration)) : 0;
+  const GREEN = '#1ed760', REST = '#42506e';
+  if (s.peaks && s.peaks.length) {
+    const n = s.peaks.length, bw = W / n;
+    for (let i = 0; i < n; i++) {
+      const p = Math.max(0.05, s.peaks[i]);
+      const bh = p * (H - 8 * dpr);
+      ctx.fillStyle = (i / n <= f) ? GREEN : REST;
+      ctx.fillRect(i * bw + bw * 0.22, mid - bh / 2, Math.max(1, bw * 0.56), bh);
+    }
+  } else {
+    const N = 90, phase = (!audio.paused && !audio.ended) ? performance.now() / 240 : 0;
+    const seedText = s.id + '|' + (s.title || '');
+    const draw = (color) => {
+      ctx.beginPath();
+      for (let i = 0; i <= N; i++) {
+        const t = i / N, x = t * W, y = mid - ribbonAmp(seedText, t, phase) * H * 0.36;
+        i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+      }
+      for (let i = N; i >= 0; i--) {
+        const t = i / N, x = t * W, y = mid + ribbonAmp(seedText, t, phase) * H * 0.14;
+        ctx.lineTo(x, y);
+      }
+      ctx.closePath(); ctx.fillStyle = color; ctx.fill();
+    };
+    draw(REST);
+    if (f > 0) { ctx.save(); ctx.beginPath(); ctx.rect(0, 0, W * f, H); ctx.clip(); draw(GREEN); ctx.restore(); }
+  }
+  ctx.fillStyle = 'rgba(255,255,255,.9)';
+  ctx.fillRect(Math.max(0, Math.round(f * W) - dpr), 2 * dpr, 2 * dpr, H - 4 * dpr);
+}
+
+let waveRafId = 0;
+function kickWave() {
+  if (waveRafId) return;
+  const step = () => {
+    waveRafId = 0;
+    if (audio.paused || audio.ended || document.hidden || $('#player').classList.contains('hidden')) return;
+    drawWave();
+    waveRafId = requestAnimationFrame(step);
+  };
+  waveRafId = requestAnimationFrame(step);
+}
+
+let waveSeeking = false;
+function waveSeekTo(e) {
+  const r = waveCv.getBoundingClientRect();
+  const f = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
+  if (isFinite(audio.duration) && audio.duration) {
+    audio.currentTime = f * audio.duration;
+    $('#p-cur').textContent = fmtTime(audio.currentTime);
+    drawWave();
+  }
+}
+waveCv.addEventListener('pointerdown', (e) => { waveSeeking = true; try { waveCv.setPointerCapture(e.pointerId); } catch (err) {} waveSeekTo(e); });
+waveCv.addEventListener('pointermove', (e) => { if (waveSeeking) waveSeekTo(e); });
+waveCv.addEventListener('pointerup', () => { waveSeeking = false; });
+waveCv.addEventListener('pointercancel', () => { waveSeeking = false; });
+
 /* ================= player UI ================= */
 function updatePlayerUI() {
   const s = currentSong();
@@ -709,14 +999,15 @@ function updatePlayerUI() {
   if (!s) return;
   $('#mini-title').textContent = s.title;
   $('#mini-sub').textContent = s.artist + (s.sessionOnly ? ' · session file' : '');
-  const label = playing ? '⏸' : '▶';
-  $('#mini-play').textContent = label; $('#p-play').textContent = label;
+  const playIcon = icon(playing ? 'pause' : 'play');
+  $('#mini-play').innerHTML = playIcon; $('#p-play').innerHTML = playIcon;
   $('#p-title').textContent = s.title;
   $('#p-artist').textContent = s.artist + (s.album ? ' — ' + s.album : '');
   $('#p-src').textContent = 'On this device · ' + fmtSize(s.size) + (s.sessionOnly ? ' · plays for this session (not stored)' : ' · stored on this device');
   $('#p-shuffle').classList.toggle('toggled', state.shuffle);
   $('#p-repeat').classList.toggle('toggled', state.repeat !== 'off');
-  $('#p-repeat').textContent = state.repeat === 'one' ? '🔂' : '🔁';
+  $('#p-repeat').innerHTML = icon(state.repeat === 'one' ? 'repeatOne' : 'repeat');
+  if (!$('#player').classList.contains('hidden')) { drawWave(); kickWave(); }
   if ('mediaSession' in navigator) {
     try {
       navigator.mediaSession.metadata = new MediaMetadata({
@@ -776,6 +1067,17 @@ async function removeSong(id) {
 }
 
 /* ================= events ================= */
+/* Fill the static buttons with SVG icons (they ship as empty shells). */
+const FILL_ICONS = {
+  'mini-prev': 'prev', 'mini-play': 'play', 'mini-next': 'next',
+  'p-prev': 'prev', 'p-play': 'play', 'p-next': 'next',
+  'p-shuffle': 'shuffle', 'p-repeat': 'repeat', 'p-close': 'chevD',
+  'vol-lo': 'volLow', 'vol-hi': 'volHigh', 'mini-art': 'note', 'p-art': 'note',
+};
+for (const id in FILL_ICONS) { const el = document.getElementById(id); if (el) el.innerHTML = icon(FILL_ICONS[id]); }
+$('#p-sleep').insertAdjacentHTML('afterbegin', icon('moon'));
+document.addEventListener('pointerdown', () => { if (AC && AC.state === 'suspended') AC.resume().catch(() => {}); });
+
 $('#btn-add').addEventListener('click', () => $('#file-input').click());
 $('#file-input').addEventListener('change', (e) => { importFiles(e.target.files); e.target.value = ''; });
 $('#search').addEventListener('input', (e) => { state.query = e.target.value.trim(); render(); });
@@ -798,7 +1100,7 @@ $('#main').addEventListener('click', (e) => {
   const menu = e.target.closest('[data-menu]');
   if (menu) { openMenu(menu.dataset.menu); return; }
   const row = e.target.closest('[data-play]');
-  if (row) playSong(row.dataset.play, visibleSongs());
+  if (row) { ensureAudioGraph(); playSong(row.dataset.play, visibleSongs()); }
 });
 
 $('#pl-create').addEventListener('click', createPlFromForm);
@@ -811,43 +1113,71 @@ $('#sheetWrap').addEventListener('click', async (e) => {
   const b = e.target.closest('[data-act]'); if (!b || !sheetSongId) return;
   const id = sheetSongId, act = b.dataset.act;
   closeMenu();
-  if (act === 'play') playSong(id, visibleSongs());
+  if (act === 'play') { ensureAudioGraph(); playSong(id, visibleSongs()); }
   else if (act === 'fav') { state.favorites.has(id) ? state.favorites.delete(id) : state.favorites.add(id); saveMeta(); render(); }
   else if (act === 'addpl') { const pl = state.playlists[Number(b.dataset.pl)]; if (pl && !pl.ids.includes(id)) { pl.ids.push(id); saveMeta(); toast('Added to “' + pl.name + '”'); } }
   else if (act === 'remove') removeSong(id);
 });
 
-const togglePlay = () => { if (!currentSong()) return; audio.paused ? audio.play().catch(() => {}) : audio.pause(); };
+const togglePlay = () => { if (!currentSong()) return; ensureAudioGraph(); audio.paused ? audio.play().catch(() => {}) : audio.pause(); };
 $('#mini-play').addEventListener('click', (e) => { e.stopPropagation(); togglePlay(); });
 $('#p-play').addEventListener('click', togglePlay);
-$('#mini-next').addEventListener('click', (e) => { e.stopPropagation(); next(false); });
-$('#mini-prev').addEventListener('click', (e) => { e.stopPropagation(); prev(); });
-$('#p-next').addEventListener('click', () => next(false));
-$('#p-prev').addEventListener('click', prev);
-$('#mini-meta').addEventListener('click', () => $('#player').classList.remove('hidden'));
-$('#mini-art').addEventListener('click', () => $('#player').classList.remove('hidden'));
+$('#mini-next').addEventListener('click', (e) => { e.stopPropagation(); ensureAudioGraph(); next(false); });
+$('#mini-prev').addEventListener('click', (e) => { e.stopPropagation(); ensureAudioGraph(); prev(); });
+$('#p-next').addEventListener('click', () => { ensureAudioGraph(); next(false); });
+$('#p-prev').addEventListener('click', () => { ensureAudioGraph(); prev(); });
+const openPlayer = () => { $('#player').classList.remove('hidden'); setTimeout(() => { drawWave(); kickWave(); }, 40); };
+$('#mini-meta').addEventListener('click', openPlayer);
+$('#mini-art').addEventListener('click', openPlayer);
 $('#p-close').addEventListener('click', () => $('#player').classList.add('hidden'));
 $('#p-shuffle').addEventListener('click', () => { state.shuffle = !state.shuffle; saveMeta(); updatePlayerUI(); });
 $('#p-repeat').addEventListener('click', () => {
   state.repeat = state.repeat === 'off' ? 'all' : state.repeat === 'all' ? 'one' : 'off';
   saveMeta(); updatePlayerUI(); toast('Repeat: ' + state.repeat);
 });
-$('#p-vol').addEventListener('input', (e) => { audio.volume = e.target.value / 100; saveMeta(); });
+$('#p-vol').addEventListener('input', (e) => { ensureAudioGraph(); setVolume(e.target.value / 100); });
 
-let seeking = false;
-$('#p-seek').addEventListener('input', (e) => {
-  seeking = true;
-  if (isFinite(audio.duration) && audio.duration) $('#p-cur').textContent = fmtTime(audio.duration * e.target.value / 1000);
+$('#eq-chips').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-eq]'); if (!b) return;
+  ensureAudioGraph();
+  state.eq = b.dataset.eq; applyEq(state.eq); saveMeta();
+  toast('EQ: ' + b.textContent);
 });
-$('#p-seek').addEventListener('change', (e) => {
-  if (isFinite(audio.duration) && audio.duration) audio.currentTime = audio.duration * e.target.value / 1000;
-  seeking = false;
+
+/* Sleep timer: cycles Off -> 15 -> 30 -> 45 -> 60 minutes. */
+let sleepEndAt = 0;
+const SLEEP_STEPS = [0, 15, 30, 45, 60];
+$('#p-sleep').addEventListener('click', () => {
+  const curMin = sleepEndAt ? Math.max(1, Math.round((sleepEndAt - Date.now()) / 60000)) : 0;
+  let idx = SLEEP_STEPS.findIndex((m) => m >= curMin && (m !== 0 || !sleepEndAt));
+  idx = (idx + 1) % SLEEP_STEPS.length;
+  const mins = SLEEP_STEPS[idx];
+  sleepEndAt = mins ? Date.now() + mins * 60000 : 0;
+  $('#p-sleep').classList.toggle('on', !!sleepEndAt);
+  $('#sleep-label').textContent = sleepEndAt ? 'Sleep ' + mins + 'm' : 'Sleep off';
+  toast(sleepEndAt ? 'Sleep timer: ' + mins + ' minutes' : 'Sleep timer off');
 });
+setInterval(() => {
+  if (!sleepEndAt) return;
+  const left = sleepEndAt - Date.now();
+  if (left <= 0) {
+    sleepEndAt = 0;
+    audio.pause();
+    $('#p-sleep').classList.remove('on');
+    $('#sleep-label').textContent = 'Sleep off';
+    toast('Sleep timer — playback stopped');
+    return;
+  }
+  $('#sleep-label').textContent = 'Sleep ' + fmtTime(left / 1000);
+}, 1000);
+
 audio.addEventListener('timeupdate', () => {
-  if (!seeking && isFinite(audio.duration) && audio.duration) {
-    $('#p-seek').value = Math.round(audio.currentTime / audio.duration * 1000);
+  if (isFinite(audio.duration) && audio.duration) {
     $('#p-cur').textContent = fmtTime(audio.currentTime);
     $('#p-dur').textContent = fmtTime(audio.duration);
+    const mf = $('#mini-prog-fill');
+    if (mf) mf.style.width = (audio.currentTime / audio.duration * 100) + '%';
+    if (!$('#player').classList.contains('hidden') && !waveSeeking) drawWave();
     /* If the header duration was missing/wrong, learn the real one. */
     const s = currentSong();
     if (s && Math.abs((s.duration || 0) - audio.duration) > 1.5) {
@@ -881,6 +1211,7 @@ window.addEventListener('drop', (e) => { e.preventDefault(); importFiles(e.dataT
 (async function boot() {
   await loadMeta();
   $('#sort').value = state.sort;
+  applyEq(state.eq);
   try {
     const tracks = await DB.getAll('tracks');
     const fileKeys = new Set(await DB.keys('files').catch(() => []));
