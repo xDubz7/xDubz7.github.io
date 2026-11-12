@@ -188,7 +188,7 @@ main{padding:12px 12px calc(120px + var(--sab))}
 
 /* ---------- waveform seek ---------- */
 #p-wave{flex:1;height:46px;touch-action:none;cursor:pointer}
-#p-spec{width:100%;height:52px;display:none;margin-top:8px}
+#p-scroll{width:100%;height:54px;display:block;margin-top:8px}
 
 /* ---------- player extras: sleep + EQ ---------- */
 .eqrow{display:flex;align-items:center;gap:10px;margin-top:12px}
@@ -280,7 +280,7 @@ main{padding:12px 12px calc(120px + var(--sab))}
     <canvas id="p-wave"></canvas>
     <span id="p-dur">0:00</span>
   </div>
-  <canvas id="p-spec"></canvas>
+  <canvas id="p-scroll"></canvas>
   <div class="controls">
     <button class="pbtn" id="p-shuffle" aria-label="Shuffle"></button>
     <button class="pbtn" id="p-prev" aria-label="Previous"></button>
@@ -549,36 +549,6 @@ async function parseWav(r) {
   return res;
 }
 
-/* Tiny iterative FFT (radix-2) — returns magnitudes for the first N/2 bins.
-   Used only on small sampled slices at import time, never on live audio. */
-function fftMagnitudes(buf) {
-  const n = buf.length;
-  const re = new Float64Array(buf), im = new Float64Array(n);
-  for (let i = 1, j = 0; i < n; i++) {
-    let bit = n >> 1;
-    for (; j & bit; bit >>= 1) j ^= bit;
-    j ^= bit;
-    if (i < j) { const tr = re[i]; re[i] = re[j]; re[j] = tr; const ti = im[i]; im[i] = im[j]; im[j] = ti; }
-  }
-  for (let len = 2; len <= n; len <<= 1) {
-    const ang = (-2 * Math.PI) / len, wr = Math.cos(ang), wi = Math.sin(ang);
-    for (let i = 0; i < n; i += len) {
-      let cwr = 1, cwi = 0;
-      for (let j = 0; j < len / 2; j++) {
-        const ur = re[i + j], ui = im[i + j];
-        const vr = re[i + j + len / 2] * cwr - im[i + j + len / 2] * cwi;
-        const vi = re[i + j + len / 2] * cwi + im[i + j + len / 2] * cwr;
-        re[i + j] = ur + vr; im[i + j] = ui + vi;
-        re[i + j + len / 2] = ur - vr; im[i + j + len / 2] = ui - vi;
-        const nwr = cwr * wr - cwi * wi; cwi = cwr * wi + cwi * wr; cwr = nwr;
-      }
-    }
-  }
-  const mags = new Float64Array(n / 2);
-  for (let i = 0; i < n / 2; i++) mags[i] = Math.sqrt(re[i] * re[i] + im[i] * im[i]);
-  return mags;
-}
-
 /* Waveform peaks for WAVs WITHOUT decoding the file: WAV data is raw PCM,
    so a peak per bucket comes from sampling a small window of bytes at each
    bucket position (a few KB read per bucket, never the whole file — the
@@ -595,15 +565,6 @@ async function computeWavPeaks(r, info, buckets) {
   const perBucket = frames / buckets;
   const winFrames = Math.min(4096, Math.max(256, Math.floor(perBucket)));
   const peaks = new Array(buckets).fill(0);
-  /* Spectrum analysis alongside the peaks: 16 log-spaced bands (40 Hz –
-     16 kHz) per bucket, from one FFT slice per bucket. Precomputed like
-     rekordbox analysis, so playback needs NO live audio routing. */
-  const NB = 16, FFT_N = 2048;
-  const sr = info.sampleRate || 0;
-  const spec = sr > 0 ? Array.from({ length: buckets }, () => new Array(NB).fill(0)) : null;
-  const fftBuf = new Float32Array(FFT_N);
-  let specMax = 0;
-  const bandEdge = (k) => 40 * Math.pow(400, k / NB);
   const dv = (buf) => new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
   const sampleAt = (view, buf, o) => {
     if (fmt === 3) return view.getFloat32(o, true);
@@ -633,42 +594,56 @@ async function computeWavPeaks(r, info, buckets) {
       if (peak >= 0.999) break;
     }
     peaks[b] = Math.round(Math.min(1, peak) * 1000) / 1000;
-    if (spec) {
-      const midStart = bucketStart + Math.floor(perBucket / 2);
-      const nF = Math.min(FFT_N, frames - midStart);
-      if (nF >= 256) {
-        try {
-          const sbuf = await r.read(info.dataStart + midStart * info.blockAlign, nF * info.blockAlign);
-          const sview = dv(sbuf);
-          fftBuf.fill(0);
-          const ch = Math.max(1, Math.round(info.blockAlign / bps));
-          const framesInBuf = Math.floor(sbuf.length / info.blockAlign);
-          for (let fr = 0; fr < framesInBuf; fr++) {
-            let acc = 0;
-            for (let c = 0; c < ch; c++) acc += sampleAt(sview, sbuf, fr * info.blockAlign + c * bps);
-            const w = 0.5 - 0.5 * Math.cos((2 * Math.PI * fr) / FFT_N);
-            fftBuf[fr] = (acc / ch) * w;
-          }
-          const mags = fftMagnitudes(fftBuf);
-          const bands = spec[b];
-          for (let k = 0; k < NB; k++) {
-            const b0 = Math.max(1, Math.floor((bandEdge(k) / sr) * FFT_N));
-            const b1 = Math.min(FFT_N / 2 - 1, Math.max(b0 + 1, Math.floor((bandEdge(k + 1) / sr) * FFT_N)));
-            let sum = 0;
-            for (let j = b0; j < b1; j++) sum += mags[j];
-            bands[k] = sum / (b1 - b0);
-            if (bands[k] > specMax) specMax = bands[k];
-          }
-        } catch (e) { /* spectrum is decorative */ }
-      }
-    }
     if (b % 40 === 39) await tick();
   }
-  if (spec && specMax > 0) {
-    for (let b = 0; b < buckets; b++) for (let k = 0; k < NB; k++)
-      spec[b][k] = Math.round((spec[b][k] / specMax) * 1000) / 1000;
+  return peaks;
+}
+
+/* Fine-grained peaks for a short window (the scrolling strip): reads the
+   actual PCM between t0 and t1 in chunks and returns `buckets` peak
+   values. Chunked reads only — memory stays flat inside a 1.5 GB file. */
+async function computeFinePeaks(r, info, t0, t1, buckets) {
+  if (!info || !info.dataStart || !info.dataLen || !info.blockAlign || !info.sampleRate) return null;
+  const bits = info.bitsPerSample || 0;
+  const fmt = info.audioFormat || 1;
+  if (!((fmt === 1 && (bits === 8 || bits === 16 || bits === 24 || bits === 32)) || (fmt === 3 && bits === 32))) return null;
+  const bps = bits / 8;
+  const ch = Math.max(1, Math.round(info.blockAlign / bps));
+  const sr = info.sampleRate;
+  const totalFrames = Math.floor(info.dataLen / info.blockAlign);
+  const startFrame = Math.max(0, Math.floor(t0 * sr));
+  const endFrame = Math.min(totalFrames, Math.ceil(t1 * sr));
+  const out = new Float32Array(buckets);
+  if (endFrame <= startFrame) return out;
+  const perBucket = (endFrame - startFrame) / buckets;
+  const dv = (buf) => new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+  const sampleAt = (view, buf, o) => {
+    if (fmt === 3) return view.getFloat32(o, true);
+    if (bits === 16) return view.getInt16(o, true) / 32768;
+    if (bits === 8) return (buf[o] - 128) / 128;
+    if (bits === 24) { let x = buf[o] | (buf[o + 1] << 8) | (buf[o + 2] << 16); if (x & 0x800000) x -= 0x1000000; return x / 8388608; }
+    return view.getInt32(o, true) / 2147483648;
+  };
+  const CHUNK = 262144;
+  let framePos = startFrame;
+  while (framePos < endFrame) {
+    const n = Math.min(CHUNK, endFrame - framePos);
+    const buf = await r.read(info.dataStart + framePos * info.blockAlign, n * info.blockAlign);
+    const got = Math.floor(buf.length / info.blockAlign);
+    if (!got) break;
+    const view = dv(buf);
+    for (let fr = 0; fr < got; fr++) {
+      let acc = 0;
+      const base = fr * info.blockAlign;
+      for (let c = 0; c < ch; c++) acc += sampleAt(view, buf, base + c * bps);
+      const v = Math.abs(acc / ch);
+      const b = Math.min(buckets - 1, Math.floor((framePos + fr - startFrame) / perBucket));
+      if (v > out[b]) out[b] = v;
+    }
+    framePos += got;
+    await tick();
   }
-  return { peaks, spec };
+  return out;
 }
 
 async function peaksForFile(file) {
@@ -744,7 +719,7 @@ async function readTags(file) {
     if (lower.endsWith('.wav') || lower.endsWith('.aif') || lower.endsWith('.aiff')) {
       info = await parseWav(r);
       if (lower.endsWith('.wav') && info.dataStart) {
-        try { const pr = await computeWavPeaks(r, info); info.peaks = pr && pr.peaks; info.spec = pr && pr.spec; } catch (e) { /* peaks are decorative */ }
+        try { info.peaks = await computeWavPeaks(r, info); } catch (e) { /* peaks are decorative */ }
       }
     }
     else if (lower.endsWith('.flac')) info = await parseFlac(r);
@@ -758,7 +733,6 @@ async function readTags(file) {
     album: (info.album || '').trim() || '',
     duration: Math.round((duration || 0) * 10) / 10,
     peaks: info.peaks || null,
-    spec: info.spec || null,
   };
 }
 
@@ -799,7 +773,7 @@ async function importOneFile(file) {
   const record = {
     id, title: info.title, artist: info.artist, album: info.album,
     duration: info.duration, size: file.size, mime: file.type || '',
-    fileName: file.name, addedAt: Date.now(), peaks: info.peaks || null, spec: info.spec || null,
+    fileName: file.name, addedAt: Date.now(), peaks: info.peaks || null,
     persisted: false, sessionOnly: large, needsFile: false,
   };
   if (!large) {
@@ -925,7 +899,7 @@ function render() {
  * variables and the waveform via peakColor(). Saved between launches. */
 const THEMES = ['green', 'miku', 'sonic', 'shadow', 'space'];
 const THEME_NAMES = { green: 'Localify', miku: 'Hatsune Miku', sonic: 'Sonic', shadow: 'Shadow', space: 'Space' };
-const BUILD = '4.7.3';
+const BUILD = '4.8';
 let peakColorCache = {};
 function applyTheme(name, save = true) {
   state.theme = THEMES.includes(name) ? name : 'green';
@@ -969,15 +943,13 @@ function peakColor(p) {
 /* Songs imported before waveforms existed get theirs computed lazily
    the first time they play (WAV only, sampled — see computeWavPeaks). */
 async function ensurePeaks(song, file) {
-  const needPeaks = !(song.peaks && song.peaks.length >= 480);
-  if ((!needPeaks && song.spec) || song._peaksBusy) return;
+  if ((song.peaks && song.peaks.length >= 480) || song._peaksBusy) return;
   if (!/\.wav$/i.test(song.fileName || '')) return;
   song._peaksBusy = true;
   try {
-    const res = await peaksForFile(file);
-    if (res && res.peaks) {
-      song.peaks = res.peaks;
-      if (res.spec) song.spec = res.spec;
+    const peaks = await peaksForFile(file);
+    if (peaks) {
+      song.peaks = peaks;
       DB.put('tracks', song).catch(() => {});
       if (song.id === state.currentId) drawWave();
     }
@@ -1064,49 +1036,93 @@ function ribbonAmp(seedText, t, phase) {
 
 const waveCv = $('#p-wave');
 const wctx = waveCv.getContext('2d');
-const specCv = $('#p-spec');
-/* Spectrum strip under the waveform (Gabriel's pick, option D): 16 bands
-   from the CURRENT bucket of the song's precomputed analysis — drawn from
-   the file data, never from live audio routing (that broke lock-screen
-   playback in v2/v3). Songs without analysis (non-WAV) hide the strip. */
-const SPEC_BANDS = 16;
-let specLevel = new Array(SPEC_BANDS).fill(0);
-let specSongId = null;
-function drawSpec(s, f) {
-  if (!specCv) return;
-  if (!s || !s.spec || !s.spec.length) { specCv.style.display = 'none'; return; }
-  specCv.style.display = 'block'; /* must un-hide BEFORE measuring: a display:none canvas has no size */
-  const rect = specCv.getBoundingClientRect();
+const scrollCv = $('#p-scroll');
+/* MiniMeters-style scrolling waveform under the overview (Gabriel's
+   pick): the last seconds of the song flow past a fixed playhead at the
+   right edge — a filled silhouette in the SELECTED THEME's accent
+   colour. For WAVs it is drawn from REAL samples read around the
+   playhead (40 s windows, refreshed as playback moves), never from live
+   audio routing, so lock-screen playback stays untouched. Other
+   formats fall back to the overview peaks. */
+const THEME_ACCENT = { green: '#1ed760', miku: '#39c5bb', sonic: '#2f7bff', shadow: '#e10600', space: '#8b7cff' };
+const SCROLL_SECONDS = 12;
+let scrollCache = { id: null, start: 0, dur: 40, fine: null, busy: false, gen: 0 };
+function interpArr(a, pos) {
+  if (!a || !a.length) return 0;
+  const i = Math.min(a.length - 1, Math.max(0, Math.floor(pos)));
+  const fr = Math.min(1, Math.max(0, pos - i));
+  const nx = a[Math.min(a.length - 1, i + 1)] || 0;
+  return (a[i] || 0) * (1 - fr) + nx * fr;
+}
+function ensureScrollData(s, ct) {
+  if (!s || !/\.wav$/i.test(s.fileName || '')) return;
+  if (scrollCache.id !== s.id) scrollCache = { id: s.id, start: 0, dur: 40, fine: null, busy: false, gen: scrollCache.gen + 1 };
+  const c = scrollCache;
+  if (c.busy) return;
+  if (c.fine && ct >= c.start + 4 && ct <= c.start + c.dur - 12) return;
+  c.busy = true;
+  const gen = c.gen;
+  (async () => {
+    try {
+      const file = await getPlayableFile(s);
+      if (!file || gen !== scrollCache.gen) return;
+      const r = new SliceReader(file);
+      const info = await parseWav(r);
+      if (!info || !info.dataStart) return;
+      const t0 = Math.max(0, ct - 10);
+      const fine = await computeFinePeaks(r, info, t0, t0 + 40, 1600);
+      if (gen !== scrollCache.gen || !fine) return;
+      c.start = t0; c.dur = 40; c.fine = fine;
+    } catch (e) { /* scrolling strip is decorative */ }
+    if (gen === scrollCache.gen) c.busy = false;
+  })();
+}
+function drawScroll(s, f, disp) {
+  if (!scrollCv || !s) return;
+  const rect = scrollCv.getBoundingClientRect();
   if (!rect.width) return;
   const dpr = window.devicePixelRatio || 1;
   const W = Math.round(rect.width * dpr), H = Math.round(rect.height * dpr);
-  if (specCv.width !== W) specCv.width = W;
-  if (specCv.height !== H) specCv.height = H;
-  if (specSongId !== s.id) { specSongId = s.id; specLevel = new Array(SPEC_BANDS).fill(0); }
-  const ctx = specCv.getContext('2d');
+  if (scrollCv.width !== W) scrollCv.width = W;
+  if (scrollCv.height !== H) scrollCv.height = H;
+  const ctx = scrollCv.getContext('2d');
+  const ct = audio.currentTime || 0;
+  const dur = audio.duration || s.duration || 0;
+  ensureScrollData(s, ct);
+  const useFine = scrollCache.id === s.id && !!scrollCache.fine && ct >= scrollCache.start && ct <= scrollCache.start + scrollCache.dur;
+  const acc = THEME_ACCENT[state.theme] || '#1ed760';
+  const mid = H / 2;
   ctx.clearRect(0, 0, W, H);
-  ctx.fillStyle = 'rgba(255,255,255,.10)';
-  ctx.fillRect(0, H - 1, W, 1);
-  /* Interpolate between neighbouring analysis buckets: on a long mix one
-     bucket spans many seconds, so stepping bucket-to-bucket made the
-     strip look frozen. The fractional position gives it continuous drift. */
-  const pos = f * s.spec.length;
-  const bi = Math.min(s.spec.length - 1, Math.max(0, Math.floor(pos)));
-  const frac = Math.min(1, Math.max(0, pos - Math.floor(pos)));
-  const target = s.spec[bi] || [];
-  const targetNext = s.spec[Math.min(s.spec.length - 1, bi + 1)] || [];
-  const playingNow = !audio.paused && !audio.ended;
-  const bw = W / SPEC_BANDS;
-  for (let k = 0; k < SPEC_BANDS; k++) {
-    /* Sensitivity: a sqrt gain curve lifts mid/quiet bands so the bars
-       actually travel, instead of hovering near the floor. */
-    const raw = (target[k] || 0) * (1 - frac) + (targetNext[k] || 0) * frac;
-    const t = Math.min(1, Math.sqrt(raw) * 1.12);
-    specLevel[k] = playingNow ? specLevel[k] + (t - specLevel[k]) * (t > specLevel[k] ? 0.6 : 0.22) : t;
-    const bh = Math.max(dpr, specLevel[k] * (H - 4 * dpr));
-    ctx.fillStyle = 'hsl(' + Math.round(252 - k * 15.5) + ',90%,' + (50 + Math.round(specLevel[k] * 10)) + '%)';
-    ctx.fillRect(k * bw + bw * 0.16, H - bh, Math.max(1, bw * 0.64), bh);
+  ctx.fillStyle = 'rgba(255,255,255,.12)';
+  ctx.fillRect(0, mid - 0.5 * dpr, W, Math.max(1, dpr));
+  const ampAt = (t) => {
+    if (t < 0 || !dur) return 0;
+    if (useFine) return interpArr(scrollCache.fine, ((t - scrollCache.start) / scrollCache.dur) * scrollCache.fine.length);
+    return interpArr(disp, (t / dur) * (disp ? disp.length : 0));
+  };
+  const step = 2 * dpr;
+  ctx.beginPath();
+  for (let x = 0; x <= W; x += step) {
+    const t = ct - SCROLL_SECONDS + (x / W) * SCROLL_SECONDS;
+    const y = mid - Math.max(0.02, ampAt(t)) * (mid - 3 * dpr);
+    if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
   }
+  for (let x = W; x >= 0; x -= step) {
+    const t = ct - SCROLL_SECONDS + (x / W) * SCROLL_SECONDS;
+    ctx.lineTo(x, mid + Math.max(0.02, ampAt(t)) * (mid - 3 * dpr));
+  }
+  ctx.closePath();
+  ctx.globalAlpha = 0.30; ctx.fillStyle = acc; ctx.fill();
+  ctx.globalAlpha = 1;
+  ctx.beginPath();
+  for (let x = 0; x <= W; x += step) {
+    const t = ct - SCROLL_SECONDS + (x / W) * SCROLL_SECONDS;
+    const y = mid - Math.max(0.02, ampAt(t)) * (mid - 3 * dpr);
+    if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  }
+  ctx.strokeStyle = acc; ctx.lineWidth = 1.4 * dpr; ctx.stroke();
+  ctx.fillStyle = 'rgba(255,255,255,.9)';
+  ctx.fillRect(W - 2 * dpr, 2 * dpr, 2 * dpr, H - 4 * dpr);
 }
 function drawWave() {
   const s = currentSong(); if (!s) return;
@@ -1134,7 +1150,7 @@ function drawWave() {
      Gabriel asked back for: ONLY the bars around the playhead bounce,
      driven by the song's OWN loudness at the playhead — no audio routing
      needed, so lock-screen playback stays untouched. (The v4.5–4.7
-     travelling ripple across the played region is gone; the spectrum
+     travelling ripple across the played region is gone; the scrolling
      strip below now carries the wider motion.) */
   const playingNow = !audio.paused && !audio.ended;
   const playBucket = f * n;
@@ -1158,7 +1174,7 @@ function drawWave() {
   }
   ctx.fillStyle = 'rgba(255,255,255,.9)';
   ctx.fillRect(Math.max(0, Math.round(f * W) - dpr), 2 * dpr, 2 * dpr, H - 4 * dpr);
-  drawSpec(s, f);
+  drawScroll(s, f, disp);
 }
 
 let waveRafId = 0, waveLastDraw = 0, waveLevel = 0;
