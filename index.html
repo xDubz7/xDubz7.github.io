@@ -271,7 +271,7 @@ main{padding:12px 12px calc(120px + var(--sab))}
 .plrow button{flex:1;padding:12px;border-radius:12px;background:var(--panel2);border:1px solid var(--line);font-size:15px}
 .plrow button.primary{background:var(--green);border-color:var(--green);color:#04140a;font-weight:700}
 
-#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(96px + var(--sab));z-index:60;
+#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(12px + var(--sab));z-index:60;
   background:#1c2740;border:1px solid var(--line);color:var(--text);font-size:14px;
   padding:10px 16px;border-radius:999px;max-width:88vw;text-align:center;box-shadow:0 8px 24px rgba(0,0,0,.5)}
 </style>
@@ -538,6 +538,14 @@ function toast(msg) {
   const el = $('#toast'); el.textContent = msg; el.classList.remove('hidden');
   clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.add('hidden'), 3200);
 }
+/* 5.4.1: the toast sits at the very bottom now (it used to float at
+   96px, right over the Theme/Speed/Cues/Dance chips), and any tap
+   dismisses it. pointerdown fires before the click that raises a
+   toast, so the causing tap never kills its own toast. */
+document.addEventListener('pointerdown', () => {
+  const el = $('#toast');
+  if (el && !el.classList.contains('hidden')) { el.classList.add('hidden'); clearTimeout(toastTimer); }
+}, true);
 const tick = () => new Promise((r) => setTimeout(r, 0));
 
 /* ================= library backup =================
@@ -1046,7 +1054,7 @@ function render() {
  * variables and the waveform via peakColor(). Saved between launches. */
 const THEMES = ['green', 'miku', 'sonic', 'shadow', 'space', 'soundcloud', 'cdj', 'vapor', 'vinyl'];
 const THEME_NAMES = { green: 'Localify', miku: 'Hatsune Miku', sonic: 'Sonic', shadow: 'Shadow', space: 'Space', soundcloud: 'SoundCloud', cdj: 'CDJ', vapor: 'Vaporwave', vinyl: 'Vinyl' };
-const BUILD = '5.4';
+const BUILD = '5.4.1';
 let peakColorCache = {};
 function applyTheme(name, save = true) {
   state.theme = THEMES.includes(name) ? name : 'green';
