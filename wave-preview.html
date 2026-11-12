@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Localify — Waveform Styles Preview</title>
+<style>
+  *{box-sizing:border-box; margin:0; padding:0}
+  body{background:#07080c; color:#f2f2f5; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; padding:18px 14px 40px; max-width:760px; margin:0 auto}
+  h1{font-size:20px; margin-bottom:4px}
+  .sub{color:#9a9dab; font-size:13px; margin-bottom:20px; line-height:1.45}
+  .card{background:#101218; border:1px solid #22242f; border-radius:14px; padding:14px 14px 10px; margin-bottom:16px}
+  .tag{display:inline-block; background:#ffd23e; color:#14100a; font-weight:800; font-size:12px; border-radius:6px; padding:2px 8px; margin-right:8px; vertical-align:2px}
+  h2{font-size:16px; display:inline}
+  .desc{color:#b9bcc9; font-size:13px; line-height:1.5; margin:8px 0 10px}
+  canvas{width:100%; display:block; border-radius:8px; background:#05060a}
+  .legend{font-size:11.5px; color:#8b8fa3; margin-top:8px}
+  .legend b{color:#d7d9e4}
+</style>
+</head>
+<body>
+<h1>Waveform styles — pick one</h1>
+<p class="sub">All four are playing the same fake DJ mix (intro → build → drop → breakdown → drop) so you can compare fairly. These are mock-ups with made-up data — the real ones are computed from each song file, the same way rekordbox analyzes tracks. Tell me the letter you want.</p>
+
+<div class="card">
+  <span class="tag">A</span><h2>Rekordbox 3-Band</h2>
+  <p class="desc">Each bar is stacked from 3 frequency bands: <b style="color:#5b8cff">blue = bass/kick</b> at the base, <b style="color:#ffa02e">orange = mids</b> (synths, vocals) in the middle, <b style="color:#ffffff">white = highs</b> (hats, snares) at the tips. You can literally see a drop coming: the blue gets fat.</p>
+  <canvas id="cvA" height="120"></canvas>
+  <p class="legend">Played part is bright, what's ahead is dimmed. White line = playhead.</p>
+</div>
+
+<div class="card">
+  <span class="tag">B</span><h2>Rekordbox RGB</h2>
+  <p class="desc">Same three bands, but blended into one color per bar instead of stacked: <b style="color:#ff4040">red = bass</b>, <b style="color:#51e07a">green = mids</b>, <b style="color:#4d7dff">blue = highs</b>. Where everything hits at once it blends toward white — drops glow pale, bass-only parts burn red.</p>
+  <canvas id="cvB" height="120"></canvas>
+  <p class="legend">The other rekordbox mode — most information, busier look.</p>
+</div>
+
+<div class="card">
+  <span class="tag">C</span><h2>MiniMeters scrolling</h2>
+  <p class="desc">No full-song overview — a clean filled waveform that <b>scrolls</b>: the last few seconds of the song flow past, like a live meter. Minimal, one color, very “producer tool.” You lose the ability to see the whole song / tap to seek on it (seeking would stay on the mini progress bar).</p>
+  <canvas id="cvC" height="120"></canvas>
+  <p class="legend">Playhead is fixed at the right edge; the song flows underneath it.</p>
+</div>
+
+<div class="card">
+  <span class="tag">D</span><h2>Theme waveform + live spectrum below</h2>
+  <p class="desc">Keep the current per-theme waveform on top (this mock uses Shadow's red → gold), and add a <b>spectrum analyzer strip underneath</b> that dances with whatever is playing at that moment — bass on the left, highs on the right, MiniMeters Spectrum-style. The spectrum's colors replace nothing; the themes stay in charge up top.</p>
+  <canvas id="cvD" height="150"></canvas>
+  <p class="legend">Top: theme waveform. Bottom: spectrum of the exact moment under the playhead.</p>
+</div>
+
+<script>
+'use strict';
+/* ---------- synthetic DJ-mix data: 480 buckets ---------- */
+const N = 480, peaks = [], low = [], mid = [], high = [];
+function rnd(seed){ let x = seed; return () => { x = (x * 16807) % 2147483647; return x / 2147483647; }; }
+const rand = rnd(1234567);
+const SECTIONS = [ /* from, to, peak, low, mid, high */
+  [0.00, 0.10, 0.25, 0.30, 0.20, 0.10],
+  [0.10, 0.25, 0.62, 0.50, 0.50, 0.38],
+  [0.25, 0.45, 0.97, 1.00, 0.55, 0.50],
+  [0.45, 0.60, 0.35, 0.15, 0.62, 0.30],
+  [0.60, 0.75, 0.66, 0.52, 0.60, 0.52],
+  [0.75, 1.01, 1.00, 1.00, 0.62, 0.56]
+];
+function sectionAt(fr){
+  for (const s of SECTIONS) if (fr >= s[0] && fr < s[1]) {
+    const t = (fr - s[0]) / (s[1] - s[0]);
+    return { peak: s[2], low: s[3], mid: s[4], high: s[5], t };
+  }
+  return { peak: 0.3, low: 0.3, mid: 0.3, high: 0.3, t: 0 };
+}
+const jitter = [];
+for (let i = 0; i < N; i++) jitter.push(0.82 + rand() * 0.36);
+for (let i = 0; i < N; i++) {
+  const fr = i / N, s = sectionAt(fr);
+  const build = (fr > 0.10 && fr < 0.25) || (fr > 0.60 && fr < 0.75) ? 0.55 + 0.45 * s.t : 1;
+  const beat = 0.86 + 0.14 * Math.abs(Math.sin(i * 0.55));
+  peaks.push(Math.min(1, s.peak * build * jitter[i] * beat + 0.03));
+  low.push(Math.min(1, s.low * jitter[i] * beat));
+  mid.push(Math.min(1, s.mid * (0.8 + 0.4 * jitter[(i + 40) % N])));
+  high.push(Math.min(1, s.high * (0.75 + 0.5 * jitter[(i + 90) % N]) * (0.7 + 0.3 * Math.abs(Math.sin(i * 1.7)))));
+}
+/* ---------- helpers ---------- */
+function setup(id){
+  const cv = document.getElementById(id);
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  const w = cv.clientWidth, h = parseInt(cv.getAttribute('height'), 10);
+  cv.width = w * dpr; cv.height = h * dpr; cv.style.height = h + 'px';
+  const ctx = cv.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return { cv, ctx, w, h };
+}
+const A = setup('cvA'), B = setup('cvB'), C = setup('cvC'), D = setup('cvD');
+const DUR = 48; /* seconds per loop */
+let specSmooth = new Array(28).fill(0);
+
+function drawBars(S, draw){
+  const { ctx, w, h } = S, midY = h / 2, bw = w / N;
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = 'rgba(255,255,255,.13)';
+  ctx.fillRect(0, midY - 0.5, w, 1);
+  for (let i = 0; i < N; i++) draw(ctx, i, i * bw, bw, midY, h);
+}
+function playhead(S, f){
+  const { ctx, w, h } = S;
+  ctx.fillStyle = 'rgba(255,255,255,.92)';
+  ctx.fillRect(f * w - 0.75, 0, 1.5, h);
+}
+/* ---------- A: 3-band stacked ---------- */
+function drawA(f){
+  drawBars(A, (ctx, i, x, bw, midY, h) => {
+    const p = Math.max(0.04, peaks[i]);
+    const tot = Math.max(0.001, low[i] + mid[i] + high[i]);
+    const half = p * (h / 2 - 4);
+    const played = i / N <= f;
+    ctx.globalAlpha = played ? 1 : 0.32;
+    const segs = [
+      ['#2e63e7', low[i] / tot], ['#ff9a2e', mid[i] / tot], ['#f5f7ff', high[i] / tot]
+    ];
+    let acc = 0;
+    for (const [col, share] of segs) {
+      const sh = half * share;
+      ctx.fillStyle = col;
+      ctx.fillRect(x + bw * 0.15, midY - acc - sh, Math.max(1, bw * 0.66), sh);
+      ctx.fillRect(x + bw * 0.15, midY + acc, Math.max(1, bw * 0.66), sh);
+      acc += sh;
+    }
+    ctx.globalAlpha = 1;
+  });
+  playhead(A, f);
+}
+/* ---------- B: RGB blend ---------- */
+function drawB(f){
+  drawBars(B, (ctx, i, x, bw, midY, h) => {
+    const p = Math.max(0.04, peaks[i]);
+    const half = p * (h / 2 - 4);
+    const played = i / N <= f;
+    const r = Math.round(255 * Math.min(1, low[i] * 1.15));
+    const g = Math.round(225 * Math.min(1, mid[i] * 1.1));
+    const bch = Math.round(255 * Math.min(1, high[i] * 1.5));
+    ctx.globalAlpha = played ? 0.95 : 0.30;
+    ctx.fillStyle = `rgb(${r},${g},${bch})`;
+    ctx.fillRect(x + bw * 0.15, midY - half, Math.max(1, bw * 0.66), half * 2);
+    ctx.globalAlpha = 1;
+  });
+  playhead(B, f);
+}
+/* ---------- C: MiniMeters scrolling ---------- */
+function drawC(f){
+  const { ctx, w, h } = C, midY = h / 2;
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = 'rgba(255,255,255,.10)';
+  ctx.fillRect(0, midY - 0.5, w, 1);
+  const WIN = 110; /* buckets visible */
+  const head = f * N;
+  ctx.beginPath();
+  for (let px = 0; px <= w; px += 2) {
+    const idx = head - WIN + (px / w) * WIN;
+    const i0 = Math.max(0, Math.min(N - 1, Math.floor(idx)));
+    const p = peaks[i0] * (0.9 + 0.1 * Math.sin(performance.now() / 90 + i0 * 1.3));
+    const y = midY - p * (h / 2 - 6);
+    if (px === 0) ctx.moveTo(px, y); else ctx.lineTo(px, y);
+  }
+  for (let px = w; px >= 0; px -= 2) {
+    const idx = head - WIN + (px / w) * WIN;
+    const i0 = Math.max(0, Math.min(N - 1, Math.floor(idx)));
+    const p = peaks[i0] * (0.9 + 0.1 * Math.sin(performance.now() / 90 + i0 * 1.3));
+    ctx.lineTo(px, midY + p * (h / 2 - 6));
+  }
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(57,197,187,.30)';
+  ctx.fill();
+  ctx.beginPath();
+  for (let px = 0; px <= w; px += 2) {
+    const idx = head - WIN + (px / w) * WIN;
+    const i0 = Math.max(0, Math.min(N - 1, Math.floor(idx)));
+    const p = peaks[i0] * (0.9 + 0.1 * Math.sin(performance.now() / 90 + i0 * 1.3));
+    const y = midY - p * (h / 2 - 6);
+    if (px === 0) ctx.moveTo(px, y); else ctx.lineTo(px, y);
+  }
+  ctx.strokeStyle = '#39c5bb'; ctx.lineWidth = 1.6; ctx.stroke();
+  ctx.fillStyle = 'rgba(255,255,255,.92)';
+  ctx.fillRect(w - 1.5, 0, 1.5, h);
+}
+/* ---------- D: theme wave + spectrum ---------- */
+const SHADOW_STOPS = [[0.0, '#5a0d08'], [0.45, '#e10600'], [0.75, '#ff7a1a'], [1.0, '#ffd23e']];
+function lerpC(a, b, t){ return [Math.round(a[0] + (b[0] - a[0]) * t), Math.round(a[1] + (b[1] - a[1]) * t), Math.round(a[2] + (b[2] - a[2]) * t)]; }
+function hexRgb(hx){ return [parseInt(hx.slice(1, 3), 16), parseInt(hx.slice(3, 5), 16), parseInt(hx.slice(5, 7), 16)]; }
+function shadowColor(p){
+  for (let s = 1; s < SHADOW_STOPS.length; s++) {
+    if (p <= SHADOW_STOPS[s][0]) {
+      const [p0, c0] = SHADOW_STOPS[s - 1], [p1, c1] = SHADOW_STOPS[s];
+      const c = lerpC(hexRgb(c0), hexRgb(c1), (p - p0) / (p1 - p0));
+      return `rgb(${c[0]},${c[1]},${c[2]})`;
+    }
+  }
+  return '#ffd23e';
+}
+function specHue(k){ return `hsl(${260 - k * 9}, 90%, ${52 + k}%)`; }
+function drawD(f, now){
+  const { ctx, w, h } = D;
+  const waveH = 84, specTop = 96, specH = h - specTop - 6, midY = waveH / 2;
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = 'rgba(255,255,255,.13)';
+  ctx.fillRect(0, midY - 0.5, w, 1);
+  const bw = w / N;
+  for (let i = 0; i < N; i++) {
+    const p = Math.max(0.04, peaks[i]);
+    const half = p * (waveH / 2 - 4);
+    ctx.fillStyle = i / N <= f ? shadowColor(p) : '#3a2c26';
+    ctx.fillRect(i * bw + bw * 0.18, midY - half, Math.max(1, bw * 0.6), half * 2);
+  }
+  ctx.fillStyle = 'rgba(255,255,255,.92)';
+  ctx.fillRect(f * w - 0.75, 0, 1.5, waveH);
+  /* spectrum of the bucket under the playhead */
+  const bi = Math.min(N - 1, Math.floor(f * N));
+  const nb = specSmooth.length, sbw = w / nb;
+  for (let k = 0; k < nb; k++) {
+    const target = Math.min(1,
+      low[bi] * Math.exp(-k / 3.6) +
+      mid[bi] * Math.exp(-((k - 12) * (k - 12)) / 26) +
+      high[bi] * Math.exp(-((k - 23) * (k - 23)) / 15)) * (0.86 + 0.14 * Math.sin(now / 130 + k * 1.9));
+    specSmooth[k] += (target - specSmooth[k]) * 0.35;
+    const bh = Math.max(2, specSmooth[k] * specH);
+    ctx.fillStyle = specHue(k);
+    ctx.fillRect(k * sbw + sbw * 0.16, specTop + specH - bh, Math.max(1, sbw * 0.66), bh);
+  }
+}
+/* ---------- main loop ---------- */
+function frame(now){
+  const f = (now / 1000 % DUR) / DUR;
+  drawA(f); drawB(f); drawC(f); drawD(f, now);
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
