@@ -226,7 +226,7 @@ main{padding:12px 12px calc(120px + var(--sab))}
 @keyframes eqb{0%,100%{transform:scaleY(.3)}50%{transform:scaleY(1)}}
 
 /* ---------- waveform seek ---------- */
-#p-wave{flex:1;height:46px;touch-action:none;cursor:pointer}
+#p-wave{flex:1;min-width:0;height:46px;touch-action:none;cursor:pointer}
 #p-scroll{width:100%;height:54px;display:block;margin-top:8px}
 
 /* ---------- player extras: sleep + EQ ---------- */
@@ -1028,7 +1028,7 @@ function render() {
  * variables and the waveform via peakColor(). Saved between launches. */
 const THEMES = ['green', 'miku', 'sonic', 'shadow', 'space', 'soundcloud', 'cdj', 'vapor', 'vinyl'];
 const THEME_NAMES = { green: 'Localify', miku: 'Hatsune Miku', sonic: 'Sonic', shadow: 'Shadow', space: 'Space', soundcloud: 'SoundCloud', cdj: 'CDJ', vapor: 'Vaporwave', vinyl: 'Vinyl' };
-const BUILD = '5.1';
+const BUILD = '5.1.1';
 let peakColorCache = {};
 function applyTheme(name, save = true) {
   state.theme = THEMES.includes(name) ? name : 'green';
@@ -1246,7 +1246,7 @@ function drawScroll(s, f, disp) {
   const rect = scrollCv.getBoundingClientRect();
   if (!rect.width) return;
   const dpr = window.devicePixelRatio || 1;
-  const W = Math.round(rect.width * dpr), H = Math.round(rect.height * dpr);
+  const W = Math.round(Math.min(rect.width, window.innerWidth || rect.width) * dpr), H = Math.round(rect.height * dpr);
   if (scrollCv.width !== W) scrollCv.width = W;
   if (scrollCv.height !== H) scrollCv.height = H;
   const ctx = scrollCv.getContext('2d');
@@ -1317,7 +1317,11 @@ function drawWave() {
   const rect = waveCv.getBoundingClientRect();
   if (!rect.width) return;
   const dpr = window.devicePixelRatio || 1;
-  const W = Math.round(rect.width * dpr), H = Math.round(rect.height * dpr);
+  /* Clamp to sane bounds: if a resume/rotation frame ever reports a
+     bogus width, one bad draw must not stick (see min-width fix). */
+  const cssW = Math.min(rect.width, window.innerWidth || rect.width);
+  const cssH = Math.min(rect.height, 90);
+  const W = Math.round(cssW * dpr), H = Math.round(cssH * dpr);
   if (waveCv.width !== W || waveCv.height !== H) { waveCv.width = W; waveCv.height = H; }
   const ctx = wctx, mid = H / 2;
   ctx.clearRect(0, 0, W, H);
@@ -1390,6 +1394,14 @@ function kickWave() {
   waveRafId = requestAnimationFrame(step);
 }
 
+/* Heal thyself: after the app resumes or rotates, force a fresh draw —
+   a stale geometry frame should never survive into normal use. */
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && !$('#player').classList.contains('hidden')) { drawWave(); kickWave(); }
+});
+window.addEventListener('resize', () => {
+  if (!$('#player').classList.contains('hidden')) drawWave();
+});
 let waveSeeking = false;
 function waveSeekTo(e) {
   const r = waveCv.getBoundingClientRect();
