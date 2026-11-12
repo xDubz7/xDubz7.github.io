@@ -188,6 +188,7 @@ main{padding:12px 12px calc(120px + var(--sab))}
 
 /* ---------- waveform seek ---------- */
 #p-wave{flex:1;height:46px;touch-action:none;cursor:pointer}
+#p-spec{width:100%;height:52px;display:none;margin-top:8px}
 
 /* ---------- player extras: sleep + EQ ---------- */
 .eqrow{display:flex;align-items:center;gap:10px;margin-top:12px}
@@ -279,6 +280,7 @@ main{padding:12px 12px calc(120px + var(--sab))}
     <canvas id="p-wave"></canvas>
     <span id="p-dur">0:00</span>
   </div>
+  <canvas id="p-spec"></canvas>
   <div class="controls">
     <button class="pbtn" id="p-shuffle" aria-label="Shuffle"></button>
     <button class="pbtn" id="p-prev" aria-label="Previous"></button>
@@ -547,6 +549,36 @@ async function parseWav(r) {
   return res;
 }
 
+/* Tiny iterative FFT (radix-2) — returns magnitudes for the first N/2 bins.
+   Used only on small sampled slices at import time, never on live audio. */
+function fftMagnitudes(buf) {
+  const n = buf.length;
+  const re = new Float64Array(buf), im = new Float64Array(n);
+  for (let i = 1, j = 0; i < n; i++) {
+    let bit = n >> 1;
+    for (; j & bit; bit >>= 1) j ^= bit;
+    j ^= bit;
+    if (i < j) { const tr = re[i]; re[i] = re[j]; re[j] = tr; const ti = im[i]; im[i] = im[j]; im[j] = ti; }
+  }
+  for (let len = 2; len <= n; len <<= 1) {
+    const ang = (-2 * Math.PI) / len, wr = Math.cos(ang), wi = Math.sin(ang);
+    for (let i = 0; i < n; i += len) {
+      let cwr = 1, cwi = 0;
+      for (let j = 0; j < len / 2; j++) {
+        const ur = re[i + j], ui = im[i + j];
+        const vr = re[i + j + len / 2] * cwr - im[i + j + len / 2] * cwi;
+        const vi = re[i + j + len / 2] * cwi + im[i + j + len / 2] * cwr;
+        re[i + j] = ur + vr; im[i + j] = ui + vi;
+        re[i + j + len / 2] = ur - vr; im[i + j + len / 2] = ui - vi;
+        const nwr = cwr * wr - cwi * wi; cwi = cwr * wi + cwi * wr; cwr = nwr;
+      }
+    }
+  }
+  const mags = new Float64Array(n / 2);
+  for (let i = 0; i < n / 2; i++) mags[i] = Math.sqrt(re[i] * re[i] + im[i] * im[i]);
+  return mags;
+}
+
 /* Waveform peaks for WAVs WITHOUT decoding the file: WAV data is raw PCM,
    so a peak per bucket comes from sampling a small window of bytes at each
    bucket position (a few KB read per bucket, never the whole file — the
@@ -563,6 +595,15 @@ async function computeWavPeaks(r, info, buckets) {
   const perBucket = frames / buckets;
   const winFrames = Math.min(4096, Math.max(256, Math.floor(perBucket)));
   const peaks = new Array(buckets).fill(0);
+  /* Spectrum analysis alongside the peaks: 16 log-spaced bands (40 Hz –
+     16 kHz) per bucket, from one FFT slice per bucket. Precomputed like
+     rekordbox analysis, so playback needs NO live audio routing. */
+  const NB = 16, FFT_N = 2048;
+  const sr = info.sampleRate || 0;
+  const spec = sr > 0 ? Array.from({ length: buckets }, () => new Array(NB).fill(0)) : null;
+  const fftBuf = new Float32Array(FFT_N);
+  let specMax = 0;
+  const bandEdge = (k) => 40 * Math.pow(400, k / NB);
   const dv = (buf) => new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
   const sampleAt = (view, buf, o) => {
     if (fmt === 3) return view.getFloat32(o, true);
@@ -592,9 +633,42 @@ async function computeWavPeaks(r, info, buckets) {
       if (peak >= 0.999) break;
     }
     peaks[b] = Math.round(Math.min(1, peak) * 1000) / 1000;
+    if (spec) {
+      const midStart = bucketStart + Math.floor(perBucket / 2);
+      const nF = Math.min(FFT_N, frames - midStart);
+      if (nF >= 256) {
+        try {
+          const sbuf = await r.read(info.dataStart + midStart * info.blockAlign, nF * info.blockAlign);
+          const sview = dv(sbuf);
+          fftBuf.fill(0);
+          const ch = Math.max(1, Math.round(info.blockAlign / bps));
+          const framesInBuf = Math.floor(sbuf.length / info.blockAlign);
+          for (let fr = 0; fr < framesInBuf; fr++) {
+            let acc = 0;
+            for (let c = 0; c < ch; c++) acc += sampleAt(sview, sbuf, fr * info.blockAlign + c * bps);
+            const w = 0.5 - 0.5 * Math.cos((2 * Math.PI * fr) / FFT_N);
+            fftBuf[fr] = (acc / ch) * w;
+          }
+          const mags = fftMagnitudes(fftBuf);
+          const bands = spec[b];
+          for (let k = 0; k < NB; k++) {
+            const b0 = Math.max(1, Math.floor((bandEdge(k) / sr) * FFT_N));
+            const b1 = Math.min(FFT_N / 2 - 1, Math.max(b0 + 1, Math.floor((bandEdge(k + 1) / sr) * FFT_N)));
+            let sum = 0;
+            for (let j = b0; j < b1; j++) sum += mags[j];
+            bands[k] = sum / (b1 - b0);
+            if (bands[k] > specMax) specMax = bands[k];
+          }
+        } catch (e) { /* spectrum is decorative */ }
+      }
+    }
     if (b % 40 === 39) await tick();
   }
-  return peaks;
+  if (spec && specMax > 0) {
+    for (let b = 0; b < buckets; b++) for (let k = 0; k < NB; k++)
+      spec[b][k] = Math.round((spec[b][k] / specMax) * 1000) / 1000;
+  }
+  return { peaks, spec };
 }
 
 async function peaksForFile(file) {
@@ -670,7 +744,7 @@ async function readTags(file) {
     if (lower.endsWith('.wav') || lower.endsWith('.aif') || lower.endsWith('.aiff')) {
       info = await parseWav(r);
       if (lower.endsWith('.wav') && info.dataStart) {
-        try { info.peaks = await computeWavPeaks(r, info); } catch (e) { /* peaks are decorative */ }
+        try { const pr = await computeWavPeaks(r, info); info.peaks = pr && pr.peaks; info.spec = pr && pr.spec; } catch (e) { /* peaks are decorative */ }
       }
     }
     else if (lower.endsWith('.flac')) info = await parseFlac(r);
@@ -684,6 +758,7 @@ async function readTags(file) {
     album: (info.album || '').trim() || '',
     duration: Math.round((duration || 0) * 10) / 10,
     peaks: info.peaks || null,
+    spec: info.spec || null,
   };
 }
 
@@ -724,7 +799,7 @@ async function importOneFile(file) {
   const record = {
     id, title: info.title, artist: info.artist, album: info.album,
     duration: info.duration, size: file.size, mime: file.type || '',
-    fileName: file.name, addedAt: Date.now(), peaks: info.peaks || null,
+    fileName: file.name, addedAt: Date.now(), peaks: info.peaks || null, spec: info.spec || null,
     persisted: false, sessionOnly: large, needsFile: false,
   };
   if (!large) {
@@ -850,7 +925,7 @@ function render() {
  * variables and the waveform via peakColor(). Saved between launches. */
 const THEMES = ['green', 'miku', 'sonic', 'shadow', 'space'];
 const THEME_NAMES = { green: 'Localify', miku: 'Hatsune Miku', sonic: 'Sonic', shadow: 'Shadow', space: 'Space' };
-const BUILD = '4.6';
+const BUILD = '4.7';
 let peakColorCache = {};
 function applyTheme(name, save = true) {
   state.theme = THEMES.includes(name) ? name : 'green';
@@ -894,13 +969,15 @@ function peakColor(p) {
 /* Songs imported before waveforms existed get theirs computed lazily
    the first time they play (WAV only, sampled — see computeWavPeaks). */
 async function ensurePeaks(song, file) {
-  if ((song.peaks && song.peaks.length >= 480) || song._peaksBusy) return;
+  const needPeaks = !(song.peaks && song.peaks.length >= 480);
+  if ((!needPeaks && song.spec) || song._peaksBusy) return;
   if (!/\.wav$/i.test(song.fileName || '')) return;
   song._peaksBusy = true;
   try {
-    const peaks = await peaksForFile(file);
-    if (peaks) {
-      song.peaks = peaks;
+    const res = await peaksForFile(file);
+    if (res && res.peaks) {
+      song.peaks = res.peaks;
+      if (res.spec) song.spec = res.spec;
       DB.put('tracks', song).catch(() => {});
       if (song.id === state.currentId) drawWave();
     }
@@ -987,6 +1064,41 @@ function ribbonAmp(seedText, t, phase) {
 
 const waveCv = $('#p-wave');
 const wctx = waveCv.getContext('2d');
+const specCv = $('#p-spec');
+/* Spectrum strip under the waveform (Gabriel's pick, option D): 16 bands
+   from the CURRENT bucket of the song's precomputed analysis — drawn from
+   the file data, never from live audio routing (that broke lock-screen
+   playback in v2/v3). Songs without analysis (non-WAV) hide the strip. */
+const SPEC_BANDS = 16;
+let specLevel = new Array(SPEC_BANDS).fill(0);
+let specSongId = null;
+function drawSpec(s, f) {
+  if (!specCv) return;
+  if (!s || !s.spec || !s.spec.length) { specCv.style.display = 'none'; return; }
+  const rect = specCv.getBoundingClientRect();
+  if (!rect.width) return;
+  const dpr = window.devicePixelRatio || 1;
+  const W = Math.round(rect.width * dpr), H = Math.round(rect.height * dpr);
+  if (specCv.width !== W) specCv.width = W;
+  if (specCv.height !== H) specCv.height = H;
+  specCv.style.display = 'block';
+  if (specSongId !== s.id) { specSongId = s.id; specLevel = new Array(SPEC_BANDS).fill(0); }
+  const ctx = specCv.getContext('2d');
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = 'rgba(255,255,255,.10)';
+  ctx.fillRect(0, H - 1, W, 1);
+  const bi = Math.min(s.spec.length - 1, Math.max(0, Math.floor(f * s.spec.length)));
+  const target = s.spec[bi] || [];
+  const playingNow = !audio.paused && !audio.ended;
+  const bw = W / SPEC_BANDS;
+  for (let k = 0; k < SPEC_BANDS; k++) {
+    const t = target[k] || 0;
+    specLevel[k] = playingNow ? specLevel[k] + (t - specLevel[k]) * (t > specLevel[k] ? 0.55 : 0.18) : t;
+    const bh = Math.max(dpr, specLevel[k] * (H - 4 * dpr));
+    ctx.fillStyle = 'hsl(' + Math.round(252 - k * 15.5) + ',90%,' + (50 + Math.round(specLevel[k] * 10)) + '%)';
+    ctx.fillRect(k * bw + bw * 0.16, H - bh, Math.max(1, bw * 0.64), bh);
+  }
+}
 function drawWave() {
   const s = currentSong(); if (!s) return;
   const rect = waveCv.getBoundingClientRect();
@@ -1037,6 +1149,7 @@ function drawWave() {
   }
   ctx.fillStyle = 'rgba(255,255,255,.9)';
   ctx.fillRect(Math.max(0, Math.round(f * W) - dpr), 2 * dpr, 2 * dpr, H - 4 * dpr);
+  drawSpec(s, f);
 }
 
 let waveRafId = 0, waveLastDraw = 0, waveLevel = 0;
