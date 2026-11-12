@@ -189,6 +189,8 @@ main{padding:12px 12px calc(120px + var(--sab))}
 #player .part{width:100%;height:100%;border-radius:18px;
   background:var(--panel2);display:flex;align-items:center;justify-content:center;font-size:84px;color:var(--dim);overflow:hidden}
 #p-dancer{position:absolute;right:12px;bottom:8px;height:96px;width:auto;display:block;pointer-events:none}
+#p-stage{position:absolute;inset:0;width:100%;height:100%;display:none;border-radius:18px}
+.partwrap.stage-ring #p-dancer{left:50%;top:50%;right:auto;bottom:auto;transform:translate(-50%,-50%)}
 #player .part img{width:100%;height:100%;object-fit:cover}
 #player h2{margin:8px 0 2px;font-size:21px;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #player .artist{text-align:center;color:var(--dim);font-size:15px;margin-bottom:4px}
@@ -328,7 +330,7 @@ main{padding:12px 12px calc(120px + var(--sab))}
 
 <div id="player" class="hidden">
   <button class="close" id="p-close" aria-label="Close player"></button>
-  <div class="partwrap"><div class="part" id="p-art"></div><canvas id="p-dancer" width="330" height="384"></canvas></div>
+  <div class="partwrap"><canvas id="p-stage"></canvas><div class="part" id="p-art"></div><canvas id="p-dancer" width="330" height="384"></canvas></div>
   <h2 id="p-title">Nothing playing</h2>
   <div class="artist" id="p-artist"></div>
   <div class="src" id="p-src">On this device</div>
@@ -353,6 +355,7 @@ main{padding:12px 12px calc(120px + var(--sab))}
     <button data-ptab="cues" class="ptab">Cues</button>
     <button data-ptab="dance" class="ptab">Dance</button>
     <button data-ptab="wave" class="ptab">Wave</button>
+    <button data-ptab="stage" class="ptab">Stage</button>
   </div>
   <div class="eqrow prow" id="row-theme"><div class="eqchips" id="theme-chips">
     <button data-theme-name="green" class="eqchip on"><span class="tdot" style="background:#1ed760"></span>Localify</button><button data-theme-name="miku" class="eqchip"><span class="tdot" style="background:linear-gradient(90deg,#39c5bb 50%,#ff2e88 50%)"></span>Miku</button><button data-theme-name="sonic" class="eqchip"><span class="tdot" style="background:#2f7bff"></span>Sonic</button><button data-theme-name="shadow" class="eqchip"><span class="tdot" style="background:linear-gradient(90deg,#e10600 50%,#f5c518 50%)"></span>Shadow</button><button data-theme-name="space" class="eqchip"><span class="tdot" style="background:#8b7cff"></span>Space</button><button data-theme-name="soundcloud" class="eqchip"><span class="tdot" style="background:#ff5500"></span>SoundCloud</button><button data-theme-name="cdj" class="eqchip"><span class="tdot" style="background:#0096ff"></span>CDJ</button><button data-theme-name="vapor" class="eqchip"><span class="tdot" style="background:linear-gradient(90deg,#ff71ce 50%,#01cdfe 50%)"></span>Vaporwave</button><button data-theme-name="vinyl" class="eqchip"><span class="tdot" style="background:#e8a33d"></span>Vinyl</button>
@@ -362,6 +365,7 @@ main{padding:12px 12px calc(120px + var(--sab))}
   </div></div>
   <div class="eqrow prow hidden" id="row-cues"><div class="eqchips" id="cue-chips"></div><button class="eqchip" id="cue-add">+ Cue</button></div>
   <div class="eqrow prow hidden" id="row-wave"><div class="eqchips" id="wave-chips"><button data-wave="bands" class="eqchip on">3-Band scroll</button><button data-wave="led" class="eqchip">LED bars</button><button data-wave="curve" class="eqchip">Curve</button></div></div>
+  <div class="eqrow prow hidden" id="row-stage"><div class="eqchips" id="stage-chips"><button data-stage="art" class="eqchip on">Artwork</button><button data-stage="ring" class="eqchip">Ring</button><button data-stage="spectrum" class="eqchip">Spectrum</button><button data-stage="waterfall" class="eqchip">Waterfall</button></div></div>
   <div class="eqrow prow hidden" id="row-dance"><div class="eqchips" id="dance-chips">
     <button class="eqchip on" id="dancer-toggle">Dancer on</button>
     <button class="eqchip" id="bpm-down">−</button>
@@ -495,6 +499,7 @@ const state = {
   theme: 'green',
   rate: 1, pitchLock: true,
   waveStyle: 'bands',
+  stageStyle: 'art',
   dancer: true,
   importing: null,
   currentId: null,
@@ -510,7 +515,7 @@ function saveMeta() {
     playlists: state.playlists,
     sort: state.sort, shuffle: state.shuffle, repeat: state.repeat,
     theme: state.theme, currentId: state.currentId, rate: state.rate, pitchLock: state.pitchLock,
-    dancer: state.dancer !== false, seenBuild: state.seenBuild || null, waveStyle: state.waveStyle || 'bands',
+    dancer: state.dancer !== false, seenBuild: state.seenBuild || null, waveStyle: state.waveStyle || 'bands', stageStyle: state.stageStyle || 'art',
   }}).catch(() => {});
 }
 async function loadMeta() {
@@ -527,6 +532,7 @@ async function loadMeta() {
     state.dancer = v.dancer !== false;
     state.seenBuild = v.seenBuild || null;
     state.waveStyle = ['bands', 'led', 'curve'].includes(v.waveStyle) ? v.waveStyle : 'bands';
+    state.stageStyle = ['art', 'ring', 'spectrum', 'waterfall'].includes(v.stageStyle) ? v.stageStyle : 'art';
     state.currentId = v.currentId || null;
   } catch (e) { /* first run */ }
 }
@@ -569,6 +575,10 @@ document.addEventListener('pointerdown', () => {
    repeats for that version. Add an entry here for every release
    that ships user-visible changes. */
 const CHANGELOG = {
+  '5.7': [
+    'New Stage tab: the artwork square can become a visualizer — Ring (spectrum circle with the dancer in the middle), Spectrum (full-size bars with a floor reflection), or Waterfall (scrolling spectrogram)',
+    'Artwork stays as a Stage choice; files without frequency data (non-WAV) keep the artwork',
+  ],
   '5.6.2': [
     'Wave styles: mid and high bands lifted, so LED bars and Curve move more where vocals and leads live',
     'Radial style removed — it took too much room',
@@ -1178,7 +1188,7 @@ function render() {
  * variables and the waveform via peakColor(). Saved between launches. */
 const THEMES = ['green', 'miku', 'sonic', 'shadow', 'space', 'soundcloud', 'cdj', 'vapor', 'vinyl'];
 const THEME_NAMES = { green: 'Localify', miku: 'Hatsune Miku', sonic: 'Sonic', shadow: 'Shadow', space: 'Space', soundcloud: 'SoundCloud', cdj: 'CDJ', vapor: 'Vaporwave', vinyl: 'Vinyl' };
-const BUILD = '5.6.2';
+const BUILD = '5.7';
 let peakColorCache = {};
 function applyTheme(name, save = true) {
   state.theme = THEMES.includes(name) ? name : 'green';
@@ -1483,7 +1493,17 @@ function bandColorAt(pal, u) {
   const a = u < 0.5 ? lo : mi, b = u < 0.5 ? mi : hi, f = u < 0.5 ? u * 2 : (u - 0.5) * 2;
   return `rgb(${Math.round(a[0] + (b[0] - a[0]) * f)},${Math.round(a[1] + (b[1] - a[1]) * f)},${Math.round(a[2] + (b[2] - a[2]) * f)})`;
 }
-function drawSpecStyle(ctx, W, H, dpr, fine, c, ct) {
+/* dB-style display tilt (5.6.2), shared by the strip styles and the
+   stage: grows as (f / 40 Hz)^0.65, capped at x24. */
+function specTilt(b, NB) { return Math.min(24, Math.pow(Math.pow(400, (b + 0.5) / NB), 0.65)); }
+let drawCycle = 0, specSmCycle = -1;
+/* Sample the band slice at the playhead into specSm (attack .5 /
+   release .18, on top of the tilt + sqrt gain). Both the strip
+   renderer and the stage call this; the cycle guard keeps it to one
+   smoothing step per drawWave pass. */
+function sampleSpecBands(fine, c, ct) {
+  if (specSmCycle === drawCycle) return;
+  specSmCycle = drawCycle;
   const spec = fine.spec, NB = spec.bands;
   if (specSmFor !== c.id) { specSm.fill(0); specSmFor = c.id; }
   const slices = spec.data.length / NB;
@@ -1493,18 +1513,14 @@ function drawSpecStyle(ctx, W, H, dpr, fine, c, ct) {
   const fr = Math.min(1, Math.max(0, pos - i0));
   for (let b = 0; b < NB; b++) {
     const raw = spec.data[i0 * NB + b] * (1 - fr) + spec.data[i1 * NB + b] * fr;
-    /* Display lift (5.6.2): band values are normalised against the
-       window's loudest band — in bass music always the sub — so mids
-       and highs read tiny on a flat scale. Analysers use a dB-style
-       tilt: progressively amplify higher bands before the sqrt gain.
-       Display only; the stored band data is unchanged. Tilt grows as
-       (f / 40 Hz)^0.65, capped at x24 — about x2 at 100 Hz, x8 at
-       1 kHz, x24 at 8 kHz. */
-    const tilt = Math.min(24, Math.pow(Math.pow(400, (b + 0.5) / NB), 0.65));
-    const target = Math.min(1, Math.sqrt(Math.max(0, raw) * tilt) * 1.25);
+    const target = Math.min(1, Math.sqrt(Math.max(0, raw) * specTilt(b, NB)) * 1.25);
     const k = target > specSm[b] ? 0.5 : 0.18;
     specSm[b] += (target - specSm[b]) * k;
   }
+}
+function drawSpecStyle(ctx, W, H, dpr, fine, c, ct) {
+  const NB = fine.spec.bands;
+  sampleSpecBands(fine, c, ct);
   const pal = THEME_BANDS[state.theme] || THEME_BANDS.green;
   const acc = THEME_ACCENT[state.theme] || '#1ed760';
   const style = state.waveStyle;
@@ -1534,7 +1550,125 @@ function drawSpecStyle(ctx, W, H, dpr, fine, c, ct) {
     ctx.globalAlpha = 0.30; ctx.fillStyle = acc; ctx.fill(); ctx.globalAlpha = 1;
   }
 }
+/* ================= stage (5.7) =================
+   The artwork square becomes a stage. Styles: ring (the NCS circle —
+   the dancer moves to its center via the .stage-ring CSS), spectrum
+   (full-stage bars + peak caps + floor reflection), waterfall (a
+   scrolling spectrogram of the band slices). All draw from the same
+   fine window as the strip; with no band data (non-WAV file, or the
+   window not ready yet) the artwork stays — never fake data. */
+const stageCv = $('#p-stage');
+const artEl = $('#p-art');
+const partwrapEl = document.querySelector('.partwrap');
+let stageShown = null;
+const stagePk = new Float32Array(32), stagePkHold = new Float32Array(32);
+let stagePkFor = null;
+function stageBandAt(x) {
+  const i = Math.max(0, Math.min(22, Math.floor(x)));
+  const f = Math.min(1, Math.max(0, x - i));
+  return specSm[i] * (1 - f) + specSm[i + 1] * f;
+}
+function stageSyncDom(show) {
+  if (stageShown === show) return;
+  stageShown = show;
+  stageCv.style.display = show ? 'block' : 'none';
+  artEl.style.display = show ? 'none' : '';
+  partwrapEl.classList.toggle('stage-ring', show && state.stageStyle === 'ring');
+}
+function drawStage() {
+  const style = state.stageStyle || 'art';
+  if (style === 'art' || !stageCv) { stageSyncDom(false); return; }
+  const s = currentSong(); if (!s) { stageSyncDom(false); return; }
+  const c = scrollCache, ct = audio.currentTime || 0;
+  const fine = (c.fine && c.id === s.id && ct >= c.start && ct <= c.start + c.dur) ? c.fine : null;
+  if (!fine || !fine.spec || !fine.spec.data) { stageSyncDom(false); return; }
+  const rect = stageCv.getBoundingClientRect();
+  if (!rect.width) return;
+  stageSyncDom(true);
+  const dpr = window.devicePixelRatio || 1;
+  const W = Math.round(Math.min(rect.width, window.innerWidth || rect.width) * dpr);
+  const H = Math.round(rect.height * dpr);
+  if (stageCv.width !== W || stageCv.height !== H) { stageCv.width = W; stageCv.height = H; }
+  const ctx = stageCv.getContext('2d');
+  ctx.clearRect(0, 0, W, H);
+  const NB = fine.spec.bands;
+  const pal = THEME_BANDS[state.theme] || THEME_BANDS.green;
+  if (stagePkFor !== c.id) { stagePk.fill(0); stagePkHold.fill(0); stagePkFor = c.id; }
+  if (style === 'waterfall') {
+    ctx.fillStyle = '#05070c';
+    ctx.fillRect(0, 0, W, H);
+    const spec = fine.spec;
+    const iNow = Math.floor((ct - c.start) / spec.sliceDur);
+    const cols = 88, cw = W / cols, ch = H / NB;
+    for (let ci = 0; ci < cols; ci++) {
+      const si = iNow - (cols - 1 - ci);
+      if (si < 0) continue;
+      for (let b = 0; b < NB; b++) {
+        const raw = spec.data[si * NB + b];
+        const v = Math.min(1, Math.sqrt(Math.max(0, raw) * specTilt(b, NB)));
+        if (v < 0.05) continue;
+        ctx.globalAlpha = 0.25 + 0.75 * v;
+        ctx.fillStyle = bandColorAt(pal, v);
+        ctx.fillRect(ci * cw, H - (b + 1) * ch, Math.max(1, cw - 0.5), Math.max(1, ch - 0.5));
+      }
+    }
+    ctx.globalAlpha = 1;
+    return;
+  }
+  sampleSpecBands(fine, c, ct);
+  if (style === 'ring') {
+    const cx = W / 2, cy = H / 2, S = Math.min(W, H);
+    let low = 0; for (let b = 0; b < 5; b++) low += specSm[b]; low /= 5;
+    const r0 = S * 0.235 * (1 + low * 0.045), maxLen = S * 0.235;
+    const n = 64;
+    ctx.lineCap = 'round';
+    for (let k = 0; k < n; k++) {
+      const v = stageBandAt((k / (n - 1)) * (NB - 1));
+      const a = -Math.PI / 2 + (k / n) * Math.PI * 2;
+      const r1 = r0 + Math.max(0.02, v) * maxLen;
+      ctx.beginPath();
+      ctx.moveTo(cx + Math.cos(a) * r0, cy + Math.sin(a) * r0);
+      ctx.lineTo(cx + Math.cos(a) * r1, cy + Math.sin(a) * r1);
+      ctx.strokeStyle = bandColorAt(pal, v);
+      ctx.lineWidth = Math.max(2 * dpr, S * 0.011);
+      ctx.stroke();
+    }
+    ctx.beginPath(); ctx.arc(cx, cy, Math.max(8 * dpr, r0 - 6 * dpr), 0, Math.PI * 2);
+    ctx.fillStyle = '#0b0f16'; ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,.20)'; ctx.lineWidth = 1.5 * dpr; ctx.stroke();
+  } else if (style === 'spectrum') {
+    const n = 28, bw = W / n;
+    const floorY = H * 0.80, maxH = H * 0.72;
+    const g = ctx.createLinearGradient(0, floorY, 0, floorY - maxH);
+    g.addColorStop(0, pal.low); g.addColorStop(0.55, pal.mid); g.addColorStop(1, pal.high);
+    const bar = (flip) => {
+      for (let i = 0; i < n; i++) {
+        const v = stageBandAt((i / (n - 1)) * (NB - 1));
+        const bh = Math.max(2, v * maxH);
+        ctx.fillStyle = g;
+        ctx.fillRect(i * bw + bw * 0.16, floorY - bh, bw * 0.68, bh);
+        if (!flip) {
+          if (v >= stagePk[i]) { stagePk[i] = v; stagePkHold[i] = 30; }
+          else if (stagePkHold[i] > 0) stagePkHold[i]--;
+          else stagePk[i] = Math.max(0, stagePk[i] - 0.005);
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(i * bw + bw * 0.16, floorY - Math.max(2, stagePk[i] * maxH) - 3 * dpr, bw * 0.68, 2.4 * dpr);
+        }
+      }
+    };
+    bar(false);
+    ctx.fillStyle = 'rgba(255,255,255,.16)';
+    ctx.fillRect(0, floorY, W, Math.max(1, dpr));
+    ctx.save();
+    ctx.globalAlpha = 0.16;
+    ctx.translate(0, floorY * 2);
+    ctx.scale(1, -0.30);
+    bar(true);
+    ctx.restore();
+  }
+}
 function drawWave() {
+  drawCycle++;
   const s = currentSong(); if (!s) return;
   const rect = waveCv.getBoundingClientRect();
   if (!rect.width) return;
@@ -1600,6 +1734,7 @@ function drawWave() {
   ctx.fillStyle = 'rgba(255,255,255,.9)';
   ctx.fillRect(Math.max(0, Math.round(f * W) - dpr), 2 * dpr, 2 * dpr, H - 4 * dpr);
   drawScroll(s, f, disp);
+  drawStage();
   drawDancer();
 }
 
@@ -2018,6 +2153,7 @@ $('#p-tabs').addEventListener('click', (e) => {
   $('#row-cues').classList.toggle('hidden', k !== 'cues');
   $('#row-dance').classList.toggle('hidden', k !== 'dance');
   $('#row-wave').classList.toggle('hidden', k !== 'wave');
+  $('#row-stage').classList.toggle('hidden', k !== 'stage');
 });
 const WAVE_HEIGHTS = { bands: '54px', led: '64px', curve: '64px' };
 let waveHeightApplied = '';
@@ -2037,6 +2173,18 @@ $('#wave-chips').addEventListener('click', (e) => {
   saveMeta(); applyWaveStyle();
   if (!$('#player').classList.contains('hidden')) drawWave();
   toast('Wave style: ' + b.textContent);
+});
+function applyStageStyle() {
+  const st = state.stageStyle || 'art';
+  document.querySelectorAll('#stage-chips [data-stage]').forEach((ch) =>
+    ch.classList.toggle('on', ch.dataset.stage === st));
+}
+$('#stage-chips').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-stage]'); if (!b) return;
+  state.stageStyle = b.dataset.stage;
+  saveMeta(); applyStageStyle();
+  if (!$('#player').classList.contains('hidden')) drawWave();
+  toast('Stage: ' + b.textContent);
 });
 $('#theme-chips').addEventListener('click', (e) => {
   const b = e.target.closest('[data-theme-name]'); if (!b) return;
@@ -2139,6 +2287,7 @@ window.addEventListener('drop', (e) => { e.preventDefault(); importFiles(e.dataT
   maybeShowWhatsNew();
   applyRate();
   applyWaveStyle();
+  applyStageStyle();
   checkForUpdate();
   const st = document.querySelector('header h1 small');
   if (st && !st.textContent.includes('build')) st.textContent += ' · build ' + BUILD;
