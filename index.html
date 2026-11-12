@@ -17,27 +17,51 @@
 :root{
   --bg:#070a11; --panel:#0e1320; --panel2:#141b2d; --line:#1f2a44;
   --text:#eef2fb; --dim:#93a1bd; --green:#1ed760; --green-d:#17b14f;
-  --red:#ff5c5c; --amber:#ffb84d; --radius:14px;
+  --red:#ff5c5c; --amber:#ffb84d; --pink:#ff5c7a; --radius:14px;
   --sat:env(safe-area-inset-top,0px); --sab:env(safe-area-inset-bottom,0px);
 }
-/* Hatsune Miku theme — modelled on Gabriel's HiBy x Miku reference:
-   near-black background, HOT PINK as the bold accent (banner strip, logo,
-   Add button, play button, hearts, active toggles), Miku teal for text
-   accents, progress and the quiet end of the waveform. */
+/* Hatsune Miku theme — Gabriel's art direction (v4.3): TEAL leads (buttons,
+   panels, progress, quiet waveform), and the TEXT goes hot pink. Secondary
+   text stays soft teal; a thin pink banner strip under the header nods to
+   his HiBy x Miku reference. */
 [data-theme="miku"]{
   --bg:#050507; --panel:#0d0d12; --panel2:#17141f; --line:#2e2434;
-  --dim:#8fd0c8;
+  --text:#ff4d9d; --dim:#8fd0c8;
   --green:#39c5bb; --green-d:#1f9e94; --amber:#ffd166;
   --pink:#ff2e88; --pink-d:#d6006d;
 }
 [data-theme="miku"] header{border-bottom:2px solid var(--pink)}
-[data-theme="miku"] .logo{background:var(--pink);color:#fff}
-[data-theme="miku"] .addbtn{background:var(--pink);color:#fff}
-[data-theme="miku"] .addbtn:active{background:var(--pink-d)}
-[data-theme="miku"] .pbtn.main{background:var(--pink);color:#fff}
-[data-theme="miku"] .song .fav.on{color:var(--pink)}
-[data-theme="miku"] .controls .pbtn.toggled{color:var(--pink)}
-[data-theme="miku"] .plrow button.primary{background:var(--pink);border-color:var(--pink);color:#fff}
+[data-theme="miku"] .song.playing .title{color:var(--pink)}
+/* Sonic the Hedgehog: hero blue leads, gold rings for the loud waveform
+   peaks, red (his shoes) as the secondary accent. */
+[data-theme="sonic"]{
+  --bg:#040814; --panel:#081226; --panel2:#0d1f3f; --line:#1c3560;
+  --dim:#9db9e8;
+  --green:#2f7bff; --green-d:#0057d9; --amber:#ffd23e;
+  --pink:#ff3b47;
+}
+/* Shadow the Hedgehog: black, his red, and gold — same palette as the
+   Gate Skipper Shadow theme. */
+[data-theme="shadow"]{
+  --bg:#050505; --panel:#0d0d0d; --panel2:#171717; --line:#2e2a26;
+  --text:#f3ead8; --dim:#c9b896;
+  --green:#e10600; --green-d:#9e0400; --amber:#f5c518;
+  --pink:#f5c518;
+}
+/* Space: cosmic violet, starlight lavender text, aurora cyan accent —
+   same palette as the Gate Skipper Space theme. */
+[data-theme="space"]{
+  --bg:#05060f; --panel:#0e1128; --panel2:#151a3d; --line:#232850;
+  --dim:#c9c2ff;
+  --green:#8b7cff; --green-d:#6a4fe0; --amber:#ffd166;
+  --pink:#7dd3fc;
+}
+/* Every non-default theme uses its secondary accent (--pink) for
+   favorite hearts and active transport toggles. */
+[data-theme="miku"] .song .fav.on, [data-theme="sonic"] .song .fav.on,
+[data-theme="shadow"] .song .fav.on, [data-theme="space"] .song .fav.on{color:var(--pink)}
+[data-theme="miku"] .controls .pbtn.toggled, [data-theme="sonic"] .controls .pbtn.toggled,
+[data-theme="shadow"] .controls .pbtn.toggled, [data-theme="space"] .controls .pbtn.toggled{color:var(--pink)}
 *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
 html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
   font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
@@ -257,7 +281,7 @@ main{padding:12px 12px calc(120px + var(--sab))}
     <button class="pbtn" id="p-repeat" aria-label="Repeat"></button>
   </div>
   <div class="eqrow"><span class="eqlab">THEME</span><div class="eqchips" id="theme-chips">
-    <button data-theme-name="green" class="eqchip on"><span class="tdot" style="background:#1ed760"></span>Localify</button><button data-theme-name="miku" class="eqchip"><span class="tdot" style="background:linear-gradient(90deg,#39c5bb 50%,#ff2e88 50%)"></span>Miku</button>
+    <button data-theme-name="green" class="eqchip on"><span class="tdot" style="background:#1ed760"></span>Localify</button><button data-theme-name="miku" class="eqchip"><span class="tdot" style="background:linear-gradient(90deg,#39c5bb 50%,#ff2e88 50%)"></span>Miku</button><button data-theme-name="sonic" class="eqchip"><span class="tdot" style="background:#2f7bff"></span>Sonic</button><button data-theme-name="shadow" class="eqchip"><span class="tdot" style="background:linear-gradient(90deg,#e10600 50%,#f5c518 50%)"></span>Shadow</button><button data-theme-name="space" class="eqchip"><span class="tdot" style="background:#8b7cff"></span>Space</button>
   </div></div>
 </div>
 
@@ -815,9 +839,12 @@ function render() {
  * 'green' = the Localify green. 'miku' = Hatsune Miku teal (#39c5bb) with
  * pink kept for hearts. The choice recolours the whole UI via the CSS
  * variables and the waveform via peakColor(). Saved between launches. */
+const THEMES = ['green', 'miku', 'sonic', 'shadow', 'space'];
+const THEME_NAMES = { green: 'Localify', miku: 'Hatsune Miku', sonic: 'Sonic', shadow: 'Shadow', space: 'Space' };
+const BUILD = '4.3';
 let peakColorCache = {};
 function applyTheme(name, save = true) {
-  state.theme = (name === 'miku') ? 'miku' : 'green';
+  state.theme = THEMES.includes(name) ? name : 'green';
   document.documentElement.setAttribute('data-theme', state.theme);
   peakColorCache = {};
   document.querySelectorAll('#theme-chips .eqchip').forEach((c) =>
@@ -830,14 +857,21 @@ function applyTheme(name, save = true) {
  * Gabriel's reference video: quiet bars violet/blue, mid bars cyan/green,
  * loud bars pink/red. In the Miku theme the same loudness scale runs
  * teal -> pale cyan -> Miku pink. Colours are cached per loudness step. */
+const WAVE_STOPS = {
+  miku:   [[57, 197, 187], [140, 240, 230], [255, 46, 136]],
+  sonic:  [[47, 123, 255], [125, 211, 252], [255, 210, 63]],
+  shadow: [[225, 6, 0], [255, 110, 64], [245, 197, 24]],
+  space:  [[139, 124, 255], [125, 211, 252], [255, 183, 213]],
+};
+const WAVE_REST = { green: '#3d4a63', miku: '#46324a', sonic: '#26355c', shadow: '#3a2f28', space: '#262b52' };
 function peakColor(p) {
   const q = Math.round(Math.min(1, Math.max(0, p)) * 24);
   const key = state.theme + ':' + q;
   if (peakColorCache[key]) return peakColorCache[key];
   const t = q / 24;
   let c;
-  if (state.theme === 'miku') {
-    const stops = [[57, 197, 187], [140, 240, 230], [255, 46, 136]];
+  const stops = WAVE_STOPS[state.theme];
+  if (stops) {
     const seg = t < 0.55 ? 0 : 1, lt = t < 0.55 ? t / 0.55 : (t - 0.55) / 0.45;
     const a = stops[seg], b = stops[seg + 1];
     c = `rgb(${Math.round(a[0] + (b[0] - a[0]) * lt)},${Math.round(a[1] + (b[1] - a[1]) * lt)},${Math.round(a[2] + (b[2] - a[2]) * lt)})`;
@@ -965,7 +999,7 @@ function drawWave() {
     for (let i = 0; i < 240; i++) disp.push(ribbonAmp(seedText, i / 240, 0));
   }
   const n = disp.length, bw = W / n;
-  const REST = state.theme === 'miku' ? '#46324a' : '#3d4a63';
+  const REST = WAVE_REST[state.theme] || '#3d4a63';
   /* Animation while playing (rests when paused): the bars around the
      playhead bounce, driven by the song's OWN loudness at the playhead —
      no audio routing needed, so lock-screen playback stays untouched. */
@@ -1166,12 +1200,12 @@ $('#p-repeat').addEventListener('click', () => {
 $('#theme-chips').addEventListener('click', (e) => {
   const b = e.target.closest('[data-theme-name]'); if (!b) return;
   applyTheme(b.dataset.themeName);
-  toast(b.dataset.themeName === 'miku' ? 'Theme: Hatsune Miku' : 'Theme: Localify');
+  toast('Theme: ' + THEME_NAMES[state.theme]);
 });
 $('#btn-theme').addEventListener('click', () => {
-  const nextTheme = state.theme === 'miku' ? 'green' : 'miku';
+  const nextTheme = THEMES[(THEMES.indexOf(state.theme) + 1) % THEMES.length];
   applyTheme(nextTheme);
-  toast(nextTheme === 'miku' ? 'Theme: Hatsune Miku' : 'Theme: Localify');
+  toast('Theme: ' + THEME_NAMES[state.theme]);
 });
 
 audio.addEventListener('timeupdate', () => {
@@ -1215,6 +1249,8 @@ window.addEventListener('drop', (e) => { e.preventDefault(); importFiles(e.dataT
   await loadMeta();
   $('#sort').value = state.sort;
   applyTheme(state.theme, false);
+  const st = document.querySelector('header h1 small');
+  if (st && !st.textContent.includes('build')) st.textContent += ' · build ' + BUILD;
   try {
     const tracks = await DB.getAll('tracks');
     const fileKeys = new Set(await DB.keys('files').catch(() => []));
