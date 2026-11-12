@@ -352,6 +352,7 @@ main{padding:12px 12px calc(120px + var(--sab))}
     <button data-ptab="speed" class="ptab">Speed</button>
     <button data-ptab="cues" class="ptab">Cues</button>
     <button data-ptab="dance" class="ptab">Dance</button>
+    <button data-ptab="wave" class="ptab">Wave</button>
   </div>
   <div class="eqrow prow" id="row-theme"><div class="eqchips" id="theme-chips">
     <button data-theme-name="green" class="eqchip on"><span class="tdot" style="background:#1ed760"></span>Localify</button><button data-theme-name="miku" class="eqchip"><span class="tdot" style="background:linear-gradient(90deg,#39c5bb 50%,#ff2e88 50%)"></span>Miku</button><button data-theme-name="sonic" class="eqchip"><span class="tdot" style="background:#2f7bff"></span>Sonic</button><button data-theme-name="shadow" class="eqchip"><span class="tdot" style="background:linear-gradient(90deg,#e10600 50%,#f5c518 50%)"></span>Shadow</button><button data-theme-name="space" class="eqchip"><span class="tdot" style="background:#8b7cff"></span>Space</button><button data-theme-name="soundcloud" class="eqchip"><span class="tdot" style="background:#ff5500"></span>SoundCloud</button><button data-theme-name="cdj" class="eqchip"><span class="tdot" style="background:#0096ff"></span>CDJ</button><button data-theme-name="vapor" class="eqchip"><span class="tdot" style="background:linear-gradient(90deg,#ff71ce 50%,#01cdfe 50%)"></span>Vaporwave</button><button data-theme-name="vinyl" class="eqchip"><span class="tdot" style="background:#e8a33d"></span>Vinyl</button>
@@ -360,6 +361,7 @@ main{padding:12px 12px calc(120px + var(--sab))}
     <button data-rate="0.8" class="eqchip">0.8×</button><button data-rate="1" class="eqchip on">1×</button><button data-rate="1.1" class="eqchip">1.1×</button><button data-rate="1.25" class="eqchip">1.25×</button><button data-rate="lock" class="eqchip on">Pitch lock</button>
   </div></div>
   <div class="eqrow prow hidden" id="row-cues"><div class="eqchips" id="cue-chips"></div><button class="eqchip" id="cue-add">+ Cue</button></div>
+  <div class="eqrow prow hidden" id="row-wave"><div class="eqchips" id="wave-chips"><button data-wave="bands" class="eqchip on">3-Band scroll</button><button data-wave="led" class="eqchip">LED bars</button><button data-wave="curve" class="eqchip">Curve</button><button data-wave="radial" class="eqchip">Radial</button></div></div>
   <div class="eqrow prow hidden" id="row-dance"><div class="eqchips" id="dance-chips">
     <button class="eqchip on" id="dancer-toggle">Dancer on</button>
     <button class="eqchip" id="bpm-down">−</button>
@@ -492,6 +494,7 @@ const state = {
   shuffle: false, repeat: 'off', // off | all | one
   theme: 'green',
   rate: 1, pitchLock: true,
+  waveStyle: 'bands',
   dancer: true,
   importing: null,
   currentId: null,
@@ -507,7 +510,7 @@ function saveMeta() {
     playlists: state.playlists,
     sort: state.sort, shuffle: state.shuffle, repeat: state.repeat,
     theme: state.theme, currentId: state.currentId, rate: state.rate, pitchLock: state.pitchLock,
-    dancer: state.dancer !== false, seenBuild: state.seenBuild || null,
+    dancer: state.dancer !== false, seenBuild: state.seenBuild || null, waveStyle: state.waveStyle || 'bands',
   }}).catch(() => {});
 }
 async function loadMeta() {
@@ -523,6 +526,7 @@ async function loadMeta() {
     state.pitchLock = v.pitchLock !== false;
     state.dancer = v.dancer !== false;
     state.seenBuild = v.seenBuild || null;
+    state.waveStyle = v.waveStyle || 'bands';
     state.currentId = v.currentId || null;
   } catch (e) { /* first run */ }
 }
@@ -565,6 +569,11 @@ document.addEventListener('pointerdown', () => {
    repeats for that version. Add an entry here for every release
    that ships user-visible changes. */
 const CHANGELOG = {
+  '5.6': [
+    'New Wave tab: the strip under the waveform is now choosable — 3-Band scroll (unchanged), LED bars, Curve, or Radial',
+    'LED, Curve and Radial are drawn from real frequency data at the playhead (WAV files)',
+    'The main waveform is untouched',
+  ],
   '5.5': [
     'This banner: after each update, a one-time note lists what changed',
     'New header logo — the waveform bars, recolored by your theme',
@@ -778,6 +787,34 @@ async function computeWavPeaks(r, info, buckets) {
 /* Fine-grained peaks + 3-band levels for a short window (the scrolling strip): reads the
    actual PCM between t0 and t1 in chunks and returns `buckets` peak
    values. Chunked reads only — memory stays flat inside a 1.5 GB file. */
+/* Iterative radix-2 FFT (in place, Float32Arrays). Used only on file
+   samples during analysis — never on the live audio path. */
+function fftInPlace(re, im) {
+  const n = re.length;
+  for (let i = 1, j = 0; i < n; i++) {
+    let bit = n >> 1;
+    for (; j & bit; bit >>= 1) j ^= bit;
+    j ^= bit;
+    if (i < j) {
+      let t = re[i]; re[i] = re[j]; re[j] = t;
+      t = im[i]; im[i] = im[j]; im[j] = t;
+    }
+  }
+  for (let len = 2; len <= n; len <<= 1) {
+    const ang = (-2 * Math.PI) / len, half = len >> 1;
+    for (let i = 0; i < n; i += len) {
+      for (let k = 0; k < half; k++) {
+        const wr = Math.cos(ang * k), wi = Math.sin(ang * k);
+        const ur = re[i + k], ui = im[i + k];
+        const vr = re[i + k + half] * wr - im[i + k + half] * wi;
+        const vi = re[i + k + half] * wi + im[i + k + half] * wr;
+        re[i + k] = ur + vr; im[i + k] = ui + vi;
+        re[i + k + half] = ur - vr; im[i + k + half] = ui - vi;
+      }
+    }
+  }
+}
+
 async function computeFinePeaks(r, info, t0, t1, buckets) {
   if (!info || !info.dataStart || !info.dataLen || !info.blockAlign || !info.sampleRate) return null;
   const bits = info.bitsPerSample || 0;
@@ -791,13 +828,41 @@ async function computeFinePeaks(r, info, t0, t1, buckets) {
   const endFrame = Math.min(totalFrames, Math.ceil(t1 * sr));
   const out = new Float32Array(buckets);
   const bLow = new Float32Array(buckets), bMid = new Float32Array(buckets), bHigh = new Float32Array(buckets);
-  if (endFrame <= startFrame) return { peaks: out, low: bLow, mid: bMid, high: bHigh };
+  if (endFrame <= startFrame) return { peaks: out, low: bLow, mid: bMid, high: bHigh, spec: null };
   /* Cheap 3-band split riding the same decode pass: two one-pole
      low-passes (250 Hz / 4 kHz). low = lp250, mid = lp4k - lp250,
      high = signal - lp4k. No FFT, no extra reads. */
   const a1 = 1 - Math.exp((-2 * Math.PI * 250) / sr);
   const a2 = 1 - Math.exp((-2 * Math.PI * 4000) / sr);
   let lp1 = 0, lp2 = 0;
+  /* Frequency bands for the LED / Curve / Radial strip styles: a
+     2048-pt FFT over a rolling mono buffer, one slice every ~0.1 s,
+     24 log-spaced bands (40 Hz-16 kHz). Rides the same single decode
+     pass — no extra file reads, no live audio routing. */
+  const FFT_N = 2048, SPEC_BANDS = 24;
+  const sliceEvery = Math.max(1024, Math.round(sr * 0.1));
+  const ring = new Float32Array(FFT_N);
+  const hann = new Float32Array(FFT_N);
+  for (let i = 0; i < FFT_N; i++) hann[i] = 0.5 - 0.5 * Math.cos((2 * Math.PI * i) / (FFT_N - 1));
+  const fftRe = new Float32Array(FFT_N), fftIm = new Float32Array(FFT_N);
+  const specRaw = [];
+  let ringPos = 0, sinceSlice = 0;
+  function runSpecSlice() {
+    for (let i = 0; i < FFT_N; i++) { fftRe[i] = ring[(ringPos + i) % FFT_N] * hann[i]; fftIm[i] = 0; }
+    fftInPlace(fftRe, fftIm);
+    const row = new Float32Array(SPEC_BANDS);
+    for (let b = 0; b < SPEC_BANDS; b++) {
+      const fLo = 40 * Math.pow(400, b / SPEC_BANDS);
+      const fHi = 40 * Math.pow(400, (b + 1) / SPEC_BANDS);
+      let kLo = Math.max(1, Math.floor((fLo / sr) * FFT_N));
+      let kHi = Math.min(FFT_N / 2 - 1, Math.ceil((fHi / sr) * FFT_N));
+      if (kHi <= kLo) kHi = kLo + 1;
+      let acc = 0;
+      for (let k = kLo; k < kHi; k++) acc += fftRe[k] * fftRe[k] + fftIm[k] * fftIm[k];
+      row[b] = Math.sqrt(acc / (kHi - kLo));
+    }
+    specRaw.push(row);
+  }
   const perBucket = (endFrame - startFrame) / buckets;
   const dv = (buf) => new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
   const sampleAt = (view, buf, o) => {
@@ -829,11 +894,25 @@ async function computeFinePeaks(r, info, t0, t1, buckets) {
       if (lv > bLow[b]) bLow[b] = lv;
       if (mv > bMid[b]) bMid[b] = mv;
       if (hv > bHigh[b]) bHigh[b] = hv;
+      ring[ringPos] = mono;
+      ringPos = (ringPos + 1) % FFT_N;
+      if (++sinceSlice >= sliceEvery) { sinceSlice = 0; runSpecSlice(); }
     }
     framePos += got;
     await tick();
   }
-  return { peaks: out, low: bLow, mid: bMid, high: bHigh };
+  /* Normalise the band slices to the window's loudest moment. */
+  let spec = null;
+  if (specRaw.length > 1) {
+    let mx = 0;
+    for (const row of specRaw) for (let b = 0; b < SPEC_BANDS; b++) if (row[b] > mx) mx = row[b];
+    if (mx > 0.001) {
+      const data = new Float32Array(specRaw.length * SPEC_BANDS);
+      specRaw.forEach((row, si) => { for (let b = 0; b < SPEC_BANDS; b++) data[si * SPEC_BANDS + b] = row[b] / mx; });
+      spec = { bands: SPEC_BANDS, sliceDur: sliceEvery / sr, data };
+    }
+  }
+  return { peaks: out, low: bLow, mid: bMid, high: bHigh, spec };
 }
 
 async function peaksForFile(file) {
@@ -1091,7 +1170,7 @@ function render() {
  * variables and the waveform via peakColor(). Saved between launches. */
 const THEMES = ['green', 'miku', 'sonic', 'shadow', 'space', 'soundcloud', 'cdj', 'vapor', 'vinyl'];
 const THEME_NAMES = { green: 'Localify', miku: 'Hatsune Miku', sonic: 'Sonic', shadow: 'Shadow', space: 'Space', soundcloud: 'SoundCloud', cdj: 'CDJ', vapor: 'Vaporwave', vinyl: 'Vinyl' };
-const BUILD = '5.5';
+const BUILD = '5.6';
 let peakColorCache = {};
 function applyTheme(name, save = true) {
   state.theme = THEMES.includes(name) ? name : 'green';
@@ -1321,6 +1400,15 @@ function drawScroll(s, f, disp) {
   const fine = (c.id === s.id && c.fine && c.fine.peaks && ct >= c.start && ct <= c.start + c.dur) ? c.fine : null;
   const mid = H / 2, halfH = mid - 3 * dpr;
   ctx.clearRect(0, 0, W, H);
+  /* Choosable strip styles (Wave tab, 5.6): LED / Curve / Radial draw
+     the frequency bands AT the playhead from the sampler's FFT slices.
+     The original scrolling 3-band view below is untouched and stays
+     the default; the new styles fall back to it for files with no band
+     data (non-WAV). The MAIN waveform is never affected by any of this. */
+  if ((state.waveStyle || 'bands') !== 'bands' && fine && fine.spec && fine.spec.data) {
+    drawSpecStyle(ctx, W, H, dpr, fine, c, ct);
+    return;
+  }
   ctx.fillStyle = 'rgba(255,255,255,.12)';
   ctx.fillRect(0, mid - 0.5 * dpr, W, Math.max(1, dpr));
   /* Column bars snapped to the analysis grid (a connected line through
@@ -1375,6 +1463,84 @@ function drawScroll(s, f, disp) {
   }
   ctx.fillStyle = 'rgba(255,255,255,.9)';
   ctx.fillRect(W - 2 * dpr, 2 * dpr, 2 * dpr, H - 4 * dpr);
+}
+const specSm = new Float32Array(24);
+let specSmFor = null;
+function themeRgb(hex) {
+  const n = parseInt(hex.slice(1), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+function bandColorAt(pal, u) {
+  const lo = themeRgb(pal.low), mi = themeRgb(pal.mid), hi = themeRgb(pal.high);
+  const a = u < 0.5 ? lo : mi, b = u < 0.5 ? mi : hi, f = u < 0.5 ? u * 2 : (u - 0.5) * 2;
+  return `rgb(${Math.round(a[0] + (b[0] - a[0]) * f)},${Math.round(a[1] + (b[1] - a[1]) * f)},${Math.round(a[2] + (b[2] - a[2]) * f)})`;
+}
+function drawSpecStyle(ctx, W, H, dpr, fine, c, ct) {
+  const spec = fine.spec, NB = spec.bands;
+  if (specSmFor !== c.id) { specSm.fill(0); specSmFor = c.id; }
+  const slices = spec.data.length / NB;
+  const pos = (ct - c.start) / spec.sliceDur;
+  const i0 = Math.max(0, Math.min(slices - 1, Math.floor(pos)));
+  const i1 = Math.min(slices - 1, i0 + 1);
+  const fr = Math.min(1, Math.max(0, pos - i0));
+  for (let b = 0; b < NB; b++) {
+    const raw = spec.data[i0 * NB + b] * (1 - fr) + spec.data[i1 * NB + b] * fr;
+    const target = Math.min(1, Math.sqrt(Math.max(0, raw)) * 1.25);
+    const k = target > specSm[b] ? 0.5 : 0.18;
+    specSm[b] += (target[b] - specSm[b]) * k;
+  }
+  const pal = THEME_BANDS[state.theme] || THEME_BANDS.green;
+  const acc = THEME_ACCENT[state.theme] || '#1ed760';
+  const style = state.waveStyle;
+  if (style === 'led') {
+    const bw = W / NB, segH = 6 * dpr, gap = 2.5 * dpr;
+    const rows = Math.max(4, Math.floor(H / (segH + gap)));
+    for (let i = 0; i < NB; i++) {
+      const lit = Math.round(specSm[i] * rows);
+      for (let r2 = 0; r2 < rows; r2++) {
+        const y = H - (r2 + 1) * (segH + gap) + gap;
+        ctx.fillStyle = r2 < lit ? bandColorAt(pal, r2 / rows) : 'rgba(255,255,255,.05)';
+        ctx.fillRect(i * bw + bw * 0.14, y, bw * 0.72, segH);
+      }
+    }
+  } else if (style === 'curve') {
+    const pts = [];
+    for (let i = 0; i < NB; i++) pts.push([(i / (NB - 1)) * W, H - Math.max(0.02, specSm[i]) * (H - 6 * dpr) - 2 * dpr]);
+    ctx.beginPath();
+    ctx.moveTo(0, pts[0][1]);
+    for (let i = 1; i < NB - 1; i++) {
+      const xc = (pts[i][0] + pts[i + 1][0]) / 2, yc = (pts[i][1] + pts[i + 1][1]) / 2;
+      ctx.quadraticCurveTo(pts[i][0], pts[i][1], xc, yc);
+    }
+    ctx.lineTo(W, pts[NB - 1][1]);
+    ctx.strokeStyle = acc; ctx.lineWidth = 2 * dpr; ctx.stroke();
+    ctx.lineTo(W, H); ctx.lineTo(0, H); ctx.closePath();
+    ctx.globalAlpha = 0.30; ctx.fillStyle = acc; ctx.fill(); ctx.globalAlpha = 1;
+  } else if (style === 'radial') {
+    const cx = W / 2, cy = H / 2;
+    const r0 = H * 0.17, maxLen = H * 0.315;
+    ctx.beginPath(); ctx.arc(cx, cy, Math.max(6 * dpr, r0 - 4 * dpr), 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,.14)'; ctx.lineWidth = 1.2 * dpr; ctx.stroke();
+    const n = 48, rot = performance.now() / 1000 * 0.15;
+    ctx.lineCap = 'round';
+    const bandAt = (x) => {
+      const i = Math.max(0, Math.min(NB - 2, Math.floor(x)));
+      const f2 = Math.min(1, Math.max(0, x - i));
+      return specSm[i] * (1 - f2) + specSm[i + 1] * f2;
+    };
+    for (let k = 0; k < n; k++) {
+      const v = bandAt((k / (n - 1)) * (NB - 1));
+      const a = rot + (k / n) * Math.PI * 2;
+      const r1 = r0 + Math.max(0.03, v) * maxLen;
+      ctx.beginPath();
+      ctx.moveTo(cx + Math.cos(a) * r0, cy + Math.sin(a) * r0);
+      ctx.lineTo(cx + Math.cos(a) * r1, cy + Math.sin(a) * r1);
+      ctx.strokeStyle = bandColorAt(pal, v);
+      ctx.lineWidth = 3 * dpr;
+      ctx.stroke();
+    }
+  }
 }
 function drawWave() {
   const s = currentSong(); if (!s) return;
@@ -1859,6 +2025,23 @@ $('#p-tabs').addEventListener('click', (e) => {
   $('#row-speed').classList.toggle('hidden', k !== 'speed');
   $('#row-cues').classList.toggle('hidden', k !== 'cues');
   $('#row-dance').classList.toggle('hidden', k !== 'dance');
+  $('#row-wave').classList.toggle('hidden', k !== 'wave');
+});
+const WAVE_HEIGHTS = { bands: '54px', led: '64px', curve: '64px', radial: '200px' };
+let waveHeightApplied = '';
+function applyWaveStyle() {
+  const st = state.waveStyle || 'bands';
+  document.querySelectorAll('#wave-chips [data-wave]').forEach((ch) =>
+    ch.classList.toggle('on', ch.dataset.wave === st));
+  const h = WAVE_HEIGHTS[st] || '54px';
+  if (scrollCv && waveHeightApplied !== h) { scrollCv.style.height = h; waveHeightApplied = h; }
+}
+$('#wave-chips').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-wave]'); if (!b) return;
+  state.waveStyle = b.dataset.wave;
+  saveMeta(); applyWaveStyle();
+  if (!$('#player').classList.contains('hidden')) drawWave();
+  toast('Wave style: ' + b.textContent);
 });
 $('#theme-chips').addEventListener('click', (e) => {
   const b = e.target.closest('[data-theme-name]'); if (!b) return;
@@ -1960,6 +2143,7 @@ window.addEventListener('drop', (e) => { e.preventDefault(); importFiles(e.dataT
   applyTheme(state.theme, false);
   maybeShowWhatsNew();
   applyRate();
+  applyWaveStyle();
   checkForUpdate();
   const st = document.querySelector('header h1 small');
   if (st && !st.textContent.includes('build')) st.textContent += ' · build ' + BUILD;
