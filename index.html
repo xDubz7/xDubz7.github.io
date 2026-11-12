@@ -233,7 +233,6 @@ main{padding:12px 12px calc(120px + var(--sab))}
     <button class="pbtn" id="p-next" aria-label="Next"></button>
     <button class="pbtn" id="p-repeat" aria-label="Repeat"></button>
   </div>
-  <div class="volrow"><span class="vic" id="vol-lo"></span><input id="p-vol" type="range" min="0" max="100" value="90"><span class="vic" id="vol-hi"></span></div>
   <div class="eqrow"><span class="eqlab">EQ</span><div class="eqchips" id="eq-chips">
     <button data-eq="flat" class="eqchip on">Flat</button><button data-eq="bass" class="eqchip">Bass</button><button data-eq="treble" class="eqchip">Treble</button><button data-eq="vocal" class="eqchip">Vocal</button>
   </div></div>
@@ -354,7 +353,7 @@ const state = {
   query: '',
   queue: [], qIndex: -1,
   shuffle: false, repeat: 'off', // off | all | one
-  volume: 0.9, eq: 'flat',
+  eq: 'flat',
   importing: null,
   currentId: null,
 };
@@ -368,7 +367,7 @@ function saveMeta() {
     favorites: [...state.favorites],
     playlists: state.playlists,
     sort: state.sort, shuffle: state.shuffle, repeat: state.repeat,
-    volume: state.volume, eq: state.eq, currentId: state.currentId,
+    eq: state.eq, currentId: state.currentId,
   }}).catch(() => {});
 }
 async function loadMeta() {
@@ -380,7 +379,6 @@ async function loadMeta() {
     state.sort = v.sort || 'title';
     state.shuffle = !!v.shuffle; state.repeat = v.repeat || 'off';
     state.eq = v.eq || 'flat';
-    if (typeof v.volume === 'number') { state.volume = v.volume; audio.volume = v.volume; $('#p-vol').value = Math.round(v.volume * 100); }
     state.currentId = v.currentId || null;
   } catch (e) { /* first run */ }
 }
@@ -781,14 +779,15 @@ function render() {
   }).join('');
 }
 
-/* ================= Web Audio graph: volume + EQ =================
- * iOS Safari IGNORES audio.volume on a plain <audio> element (Apple leaves
- * volume to the hardware buttons), which is why the old fader did nothing.
- * Routing the SAME element through an AudioContext with a GainNode makes
- * the fader real. This streams the file through the graph — it does NOT
- * decode it into memory (no decodeAudioData), so big WAVs stay safe.
+/* ================= Web Audio graph: EQ + waveform analyser =================
+ * The <audio> element streams through an AudioContext: three EQ filters,
+ * then an AnalyserNode that lets the waveform bounce with the actual music
+ * while it plays. Streaming through a graph does NOT decode the file into
+ * memory, so big WAVs stay safe. (There is deliberately no volume control
+ * here — iOS leaves volume to the hardware buttons, and Gabriel found the
+ * fader unnecessary; the element plays at full level.)
  * The graph is created lazily inside a user gesture (tap), as iOS requires. */
-let AC = null, gainNode = null, eqNodes = [];
+let AC = null, eqNodes = [], analyserNode = null, waveData = null;
 const EQ_PRESETS = {
   flat:   [0, 0, 0],
   bass:   [8, 2, -2],
@@ -805,20 +804,25 @@ function ensureAudioGraph() {
     const low = AC.createBiquadFilter();  low.type = 'lowshelf';  low.frequency.value = 200;
     const mid = AC.createBiquadFilter();  mid.type = 'peaking';   mid.frequency.value = 1000; mid.Q.value = 0.6;
     const high = AC.createBiquadFilter(); high.type = 'highshelf'; high.frequency.value = 4000;
-    gainNode = AC.createGain(); gainNode.gain.value = state.volume;
-    src.connect(low); low.connect(mid); mid.connect(high); high.connect(gainNode); gainNode.connect(AC.destination);
+    analyserNode = AC.createAnalyser(); analyserNode.fftSize = 2048;
+    waveData = new Uint8Array(analyserNode.fftSize);
+    src.connect(low); low.connect(mid); mid.connect(high); high.connect(analyserNode); analyserNode.connect(AC.destination);
     eqNodes = [low, mid, high];
-    audio.volume = 1; /* the gain node owns volume from here on */
     applyEq(state.eq);
     if (AC.state === 'suspended') AC.resume().catch(() => {});
     return true;
   } catch (e) { AC = null; return false; }
 }
-function setVolume(v) {
-  state.volume = v;
-  if (gainNode && AC) gainNode.gain.setTargetAtTime(v, AC.currentTime, 0.03);
-  else audio.volume = v;
-  saveMeta();
+/* Live loudness of what's playing right now (0..1), from the analyser.
+   Zero when the graph isn't running (e.g. before the first tap). */
+function audioLevel() {
+  if (!analyserNode || !waveData) return 0;
+  try {
+    analyserNode.getByteTimeDomainData(waveData);
+    let sum = 0;
+    for (let i = 0; i < waveData.length; i += 4) { const d = (waveData[i] - 128) / 128; sum += d * d; }
+    return Math.min(1, Math.sqrt(sum / (waveData.length / 4)) * 3.2);
+  } catch (e) { return 0; }
 }
 function applyEq(name) {
   const vals = EQ_PRESETS[name] || EQ_PRESETS.flat;
@@ -936,9 +940,22 @@ function drawWave() {
   const GREEN = '#1ed760', REST = '#42506e';
   if (s.peaks && s.peaks.length) {
     const n = s.peaks.length, bw = W / n;
+    /* Animation (the original's wave "ripples and flows while a song plays,
+       and rests when paused"): while playing, bars near the playhead bounce
+       with the ACTUAL loudness coming through the analyser right now. */
+    const playingNow = !audio.paused && !audio.ended;
+    if (playingNow) waveLevel += (audioLevel() - waveLevel) * 0.35; else waveLevel *= 0.8;
+    const playBucket = f * n, nowMs = performance.now();
     for (let i = 0; i < n; i++) {
       const p = Math.max(0.05, s.peaks[i]);
-      const bh = p * (H - 8 * dpr);
+      let bh = p * (H - 8 * dpr);
+      if (waveLevel > 0.02) {
+        const dist = Math.abs(i - playBucket);
+        if (dist < 22) {
+          const boost = waveLevel * (1 - dist / 22) * (0.65 + 0.35 * Math.sin(nowMs / 110 + i * 1.35));
+          bh = Math.min(H - 2 * dpr, bh * (1 + boost * 0.9));
+        }
+      }
       ctx.fillStyle = (i / n <= f) ? GREEN : REST;
       ctx.fillRect(i * bw + bw * 0.22, mid - bh / 2, Math.max(1, bw * 0.56), bh);
     }
@@ -964,13 +981,15 @@ function drawWave() {
   ctx.fillRect(Math.max(0, Math.round(f * W) - dpr), 2 * dpr, 2 * dpr, H - 4 * dpr);
 }
 
-let waveRafId = 0;
+let waveRafId = 0, waveLastDraw = 0, waveLevel = 0;
 function kickWave() {
   if (waveRafId) return;
-  const step = () => {
+  const step = (now) => {
     waveRafId = 0;
     if (audio.paused || audio.ended || document.hidden || $('#player').classList.contains('hidden')) return;
-    drawWave();
+    /* ~30 fps is plenty for the flow and kind to the battery — the same
+       gating the original used (wave runs only while the player is open). */
+    if (!waveLastDraw || now - waveLastDraw >= 33) { drawWave(); waveLastDraw = now; }
     waveRafId = requestAnimationFrame(step);
   };
   waveRafId = requestAnimationFrame(step);
@@ -1072,7 +1091,7 @@ const FILL_ICONS = {
   'mini-prev': 'prev', 'mini-play': 'play', 'mini-next': 'next',
   'p-prev': 'prev', 'p-play': 'play', 'p-next': 'next',
   'p-shuffle': 'shuffle', 'p-repeat': 'repeat', 'p-close': 'chevD',
-  'vol-lo': 'volLow', 'vol-hi': 'volHigh', 'mini-art': 'note', 'p-art': 'note',
+  'mini-art': 'note', 'p-art': 'note',
 };
 for (const id in FILL_ICONS) { const el = document.getElementById(id); if (el) el.innerHTML = icon(FILL_ICONS[id]); }
 $('#p-sleep').insertAdjacentHTML('afterbegin', icon('moon'));
@@ -1135,8 +1154,6 @@ $('#p-repeat').addEventListener('click', () => {
   state.repeat = state.repeat === 'off' ? 'all' : state.repeat === 'all' ? 'one' : 'off';
   saveMeta(); updatePlayerUI(); toast('Repeat: ' + state.repeat);
 });
-$('#p-vol').addEventListener('input', (e) => { ensureAudioGraph(); setVolume(e.target.value / 100); });
-
 $('#eq-chips').addEventListener('click', (e) => {
   const b = e.target.closest('[data-eq]'); if (!b) return;
   ensureAudioGraph();
