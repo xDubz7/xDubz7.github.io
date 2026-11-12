@@ -20,11 +20,25 @@
   --red:#ff5c5c; --amber:#ffb84d; --radius:14px;
   --sat:env(safe-area-inset-top,0px); --sab:env(safe-area-inset-bottom,0px);
 }
-/* Hatsune Miku theme: her signature teal, deep-sea panels, pink kept for hearts. */
+/* Hatsune Miku theme — modelled on Gabriel's HiBy x Miku reference:
+   near-black background, HOT PINK as the bold accent (banner strip, logo,
+   Add button, play button, hearts, active toggles), Miku teal for text
+   accents, progress and the quiet end of the waveform. */
 [data-theme="miku"]{
-  --bg:#06100f; --panel:#0b1a19; --panel2:#10302d; --line:#1d4541;
+  --bg:#050507; --panel:#0d0d12; --panel2:#17141f; --line:#2e2434;
+  --dim:#8fd0c8;
   --green:#39c5bb; --green-d:#1f9e94; --amber:#ffd166;
+  --pink:#ff2e88; --pink-d:#d6006d;
 }
+[data-theme="miku"] header{border-bottom:2px solid var(--pink)}
+[data-theme="miku"] .logo{background:var(--pink);color:#fff}
+[data-theme="miku"] .addbtn{background:var(--pink);color:#fff}
+[data-theme="miku"] .addbtn:active{background:var(--pink-d)}
+[data-theme="miku"] .pbtn.main{background:var(--pink);color:#fff}
+[data-theme="miku"] .song .fav.on{color:var(--pink)}
+[data-theme="miku"] .controls .pbtn.toggled{color:var(--pink)}
+[data-theme="miku"] .xbtn.on{color:var(--pink);border-color:var(--pink)}
+[data-theme="miku"] .plrow button.primary{background:var(--pink);border-color:var(--pink);color:#fff}
 *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
 html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
   font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
@@ -244,7 +258,7 @@ main{padding:12px 12px calc(120px + var(--sab))}
     <button class="pbtn" id="p-repeat" aria-label="Repeat"></button>
   </div>
   <div class="eqrow"><span class="eqlab">THEME</span><div class="eqchips" id="theme-chips">
-    <button data-theme-name="green" class="eqchip on"><span class="tdot" style="background:#1ed760"></span>Localify</button><button data-theme-name="miku" class="eqchip"><span class="tdot" style="background:#39c5bb"></span>Miku</button>
+    <button data-theme-name="green" class="eqchip on"><span class="tdot" style="background:#1ed760"></span>Localify</button><button data-theme-name="miku" class="eqchip"><span class="tdot" style="background:linear-gradient(90deg,#39c5bb 50%,#ff2e88 50%)"></span>Miku</button>
   </div></div>
   <div class="extrarow"><button class="xbtn" id="p-sleep"><span id="sleep-label">Sleep off</span></button></div>
 </div>
@@ -825,8 +839,8 @@ function peakColor(p) {
   const t = q / 24;
   let c;
   if (state.theme === 'miku') {
-    const stops = [[57, 197, 187], [127, 231, 220], [255, 123, 172]];
-    const seg = t < 0.7 ? 0 : 1, lt = t < 0.7 ? t / 0.7 : (t - 0.7) / 0.3;
+    const stops = [[57, 197, 187], [140, 240, 230], [255, 46, 136]];
+    const seg = t < 0.55 ? 0 : 1, lt = t < 0.55 ? t / 0.55 : (t - 0.55) / 0.45;
     const a = stops[seg], b = stops[seg + 1];
     c = `rgb(${Math.round(a[0] + (b[0] - a[0]) * lt)},${Math.round(a[1] + (b[1] - a[1]) * lt)},${Math.round(a[2] + (b[2] - a[2]) * lt)})`;
   } else {
@@ -953,7 +967,7 @@ function drawWave() {
     for (let i = 0; i < 240; i++) disp.push(ribbonAmp(seedText, i / 240, 0));
   }
   const n = disp.length, bw = W / n;
-  const REST = state.theme === 'miku' ? '#2c4f4b' : '#3d4a63';
+  const REST = state.theme === 'miku' ? '#46324a' : '#3d4a63';
   /* Animation while playing (rests when paused): the bars around the
      playhead bounce, driven by the song's OWN loudness at the playhead —
      no audio routing needed, so lock-screen playback stays untouched. */
