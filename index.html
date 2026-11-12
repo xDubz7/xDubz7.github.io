@@ -37,7 +37,6 @@
 [data-theme="miku"] .pbtn.main{background:var(--pink);color:#fff}
 [data-theme="miku"] .song .fav.on{color:var(--pink)}
 [data-theme="miku"] .controls .pbtn.toggled{color:var(--pink)}
-[data-theme="miku"] .xbtn.on{color:var(--pink);border-color:var(--pink)}
 [data-theme="miku"] .plrow button.primary{background:var(--pink);border-color:var(--pink);color:#fff}
 *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
 html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
@@ -260,7 +259,6 @@ main{padding:12px 12px calc(120px + var(--sab))}
   <div class="eqrow"><span class="eqlab">THEME</span><div class="eqchips" id="theme-chips">
     <button data-theme-name="green" class="eqchip on"><span class="tdot" style="background:#1ed760"></span>Localify</button><button data-theme-name="miku" class="eqchip"><span class="tdot" style="background:linear-gradient(90deg,#39c5bb 50%,#ff2e88 50%)"></span>Miku</button>
   </div></div>
-  <div class="extrarow"><button class="xbtn" id="p-sleep"><span id="sleep-label">Sleep off</span></button></div>
 </div>
 
 <div id="plWrap" class="hidden"><div id="plsheet">
@@ -1108,7 +1106,6 @@ const FILL_ICONS = {
   'mini-art': 'note', 'p-art': 'note', 'btn-theme': 'palette',
 };
 for (const id in FILL_ICONS) { const el = document.getElementById(id); if (el) el.innerHTML = icon(FILL_ICONS[id]); }
-$('#p-sleep').insertAdjacentHTML('afterbegin', icon('moon'));
 $('#btn-add').addEventListener('click', () => $('#file-input').click());
 $('#file-input').addEventListener('change', (e) => { importFiles(e.target.files); e.target.value = ''; });
 $('#search').addEventListener('input', (e) => { state.query = e.target.value.trim(); render(); });
@@ -1176,33 +1173,6 @@ $('#btn-theme').addEventListener('click', () => {
   applyTheme(nextTheme);
   toast(nextTheme === 'miku' ? 'Theme: Hatsune Miku' : 'Theme: Localify');
 });
-
-/* Sleep timer: cycles Off -> 15 -> 30 -> 45 -> 60 minutes. */
-let sleepEndAt = 0;
-const SLEEP_STEPS = [0, 15, 30, 45, 60];
-$('#p-sleep').addEventListener('click', () => {
-  const curMin = sleepEndAt ? Math.max(1, Math.round((sleepEndAt - Date.now()) / 60000)) : 0;
-  let idx = SLEEP_STEPS.findIndex((m) => m >= curMin && (m !== 0 || !sleepEndAt));
-  idx = (idx + 1) % SLEEP_STEPS.length;
-  const mins = SLEEP_STEPS[idx];
-  sleepEndAt = mins ? Date.now() + mins * 60000 : 0;
-  $('#p-sleep').classList.toggle('on', !!sleepEndAt);
-  $('#sleep-label').textContent = sleepEndAt ? 'Sleep ' + mins + 'm' : 'Sleep off';
-  toast(sleepEndAt ? 'Sleep timer: ' + mins + ' minutes' : 'Sleep timer off');
-});
-setInterval(() => {
-  if (!sleepEndAt) return;
-  const left = sleepEndAt - Date.now();
-  if (left <= 0) {
-    sleepEndAt = 0;
-    audio.pause();
-    $('#p-sleep').classList.remove('on');
-    $('#sleep-label').textContent = 'Sleep off';
-    toast('Sleep timer — playback stopped');
-    return;
-  }
-  $('#sleep-label').textContent = 'Sleep ' + fmtTime(left / 1000);
-}, 1000);
 
 audio.addEventListener('timeupdate', () => {
   if (isFinite(audio.duration) && audio.duration) {
