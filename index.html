@@ -32,14 +32,17 @@
 }
 [data-theme="miku"] header{border-bottom:2px solid var(--pink)}
 [data-theme="miku"] .song.playing .title{color:var(--pink)}
-/* Sonic the Hedgehog: hero blue leads, gold rings for the loud waveform
-   peaks, red (his shoes) as the secondary accent. */
+/* Sonic the Hedgehog: hero blue leads (buttons, panels, progress), and —
+   like Miku's pink — the TEXT and highlights are gold (his rings). */
 [data-theme="sonic"]{
   --bg:#040814; --panel:#081226; --panel2:#0d1f3f; --line:#1c3560;
-  --dim:#9db9e8;
+  --text:#ffd94d; --dim:#9db9e8;
   --green:#2f7bff; --green-d:#0057d9; --amber:#ffd23e;
-  --pink:#ff3b47;
+  --pink:#ffd23e;
 }
+[data-theme="sonic"] header{border-bottom:2px solid var(--amber)}
+[data-theme="sonic"] .song.playing .title{color:var(--amber)}
+[data-theme="sonic"] .eqbars i{background:var(--amber)}
 /* Shadow the Hedgehog: black, his red, and gold — same palette as the
    Gate Skipper Shadow theme. */
 [data-theme="shadow"]{
@@ -48,6 +51,9 @@
   --green:#e10600; --green-d:#9e0400; --amber:#f5c518;
   --pink:#f5c518;
 }
+[data-theme="shadow"] header{border-bottom:2px solid var(--pink)}
+[data-theme="shadow"] .song.playing .title{color:var(--pink)}
+[data-theme="shadow"] .eqbars i{background:var(--pink)}
 /* Space: cosmic violet, starlight lavender text, aurora cyan accent —
    same palette as the Gate Skipper Space theme. */
 [data-theme="space"]{
@@ -844,7 +850,7 @@ function render() {
  * variables and the waveform via peakColor(). Saved between launches. */
 const THEMES = ['green', 'miku', 'sonic', 'shadow', 'space'];
 const THEME_NAMES = { green: 'Localify', miku: 'Hatsune Miku', sonic: 'Sonic', shadow: 'Shadow', space: 'Space' };
-const BUILD = '4.5';
+const BUILD = '4.6';
 let peakColorCache = {};
 function applyTheme(name, save = true) {
   state.theme = THEMES.includes(name) ? name : 'green';
