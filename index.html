@@ -1,0 +1,906 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#070a11">
+<meta name="description" content="Localify Local - play your own music files on iPhone, offline. No YouTube, no streaming. Large WAV safe.">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Localify">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon.svg">
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+<title>Localify — Local Files</title>
+<style>
+:root{
+  --bg:#070a11; --panel:#0e1320; --panel2:#141b2d; --line:#1f2a44;
+  --text:#eef2fb; --dim:#93a1bd; --green:#1ed760; --green-d:#17b14f;
+  --red:#ff5c5c; --amber:#ffb84d; --radius:14px;
+  --sat:env(safe-area-inset-top,0px); --sab:env(safe-area-inset-bottom,0px);
+}
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+input{font:inherit}
+.hidden{display:none !important}
+
+/* ---------- header ---------- */
+header{position:sticky;top:0;z-index:20;background:rgba(7,10,17,.92);backdrop-filter:blur(10px);
+  padding:calc(10px + var(--sat)) 16px 10px;border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:10px}
+.logo{width:34px;height:34px;border-radius:9px;background:var(--green);color:#04140a;
+  display:flex;align-items:center;justify-content:center;font-size:19px;font-weight:900}
+.brand h1{font-size:19px;margin:0;letter-spacing:.2px}
+.brand small{display:block;color:var(--dim);font-size:11px;font-weight:500}
+.addbtn{margin-left:auto;background:var(--green);color:#04140a;font-weight:700;
+  padding:9px 14px;border-radius:999px;font-size:14px}
+.addbtn:active{background:var(--green-d)}
+.searchrow{display:flex;gap:8px;margin-top:12px}
+.searchrow input{flex:1;background:var(--panel2);border:1px solid var(--line);color:var(--text);
+  border-radius:999px;padding:9px 14px;outline:none;font-size:15px}
+.searchrow select{background:var(--panel2);border:1px solid var(--line);color:var(--text);
+  border-radius:999px;padding:0 8px;font-size:13px;max-width:118px}
+.chips{display:flex;gap:8px;margin-top:10px;overflow-x:auto;padding-bottom:2px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{white-space:nowrap;padding:6px 12px;border-radius:999px;background:var(--panel2);
+  border:1px solid var(--line);color:var(--dim);font-size:13px}
+.chip.on{background:var(--green);border-color:var(--green);color:#04140a;font-weight:700}
+
+/* ---------- import bar ---------- */
+#importbar{margin:12px 16px 0;background:var(--panel);border:1px solid var(--line);
+  border-radius:var(--radius);padding:10px 12px}
+#importbar .row{display:flex;justify-content:space-between;font-size:13px;color:var(--dim);gap:10px}
+#importbar .row b{color:var(--text);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.track{height:6px;background:var(--panel2);border-radius:99px;margin-top:8px;overflow:hidden}
+.track i{display:block;height:100%;width:0;background:var(--green);border-radius:99px;transition:width .2s}
+
+/* ---------- library ---------- */
+main{padding:12px 12px calc(120px + var(--sab))}
+.empty{margin:48px 20px;text-align:center;color:var(--dim);line-height:1.55}
+.empty .big{font-size:40px;margin-bottom:10px}
+.empty b{color:var(--text)}
+.note{margin:14px 4px 0;font-size:12.5px;color:var(--dim);line-height:1.5;
+  background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:10px 12px}
+.note b{color:var(--amber)}
+.song{display:flex;align-items:center;gap:12px;padding:10px 8px;border-radius:var(--radius)}
+.song:active{background:var(--panel)}
+.song.playing{background:var(--panel)}
+.song .art{width:48px;height:48px;border-radius:10px;background:var(--panel2);flex:0 0 48px;
+  display:flex;align-items:center;justify-content:center;font-size:20px;color:var(--dim);overflow:hidden}
+.song .art img{width:100%;height:100%;object-fit:cover}
+.song .meta{flex:1;min-width:0}
+.song .title{font-size:15.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.song.playing .title{color:var(--green)}
+.song .sub{font-size:12.5px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:2px}
+.badge{display:inline-block;font-size:10.5px;padding:1px 7px;border-radius:99px;margin-left:6px;vertical-align:2px;
+  background:#3a2b12;color:var(--amber);border:1px solid #6b4d15;font-weight:700}
+.badge.off{background:#33161a;color:var(--red);border-color:#6b232a}
+.song .fav{font-size:20px;color:var(--dim);padding:6px}
+.song .fav.on{color:var(--green)}
+.song .dots{font-size:20px;color:var(--dim);padding:6px 2px}
+
+/* ---------- mini player ---------- */
+#mini{position:fixed;left:10px;right:10px;bottom:calc(10px + var(--sab));z-index:30;
+  background:var(--panel2);border:1px solid var(--line);border-radius:16px;
+  display:flex;align-items:center;gap:10px;padding:8px 10px;box-shadow:0 10px 30px rgba(0,0,0,.5)}
+#mini .art{width:42px;height:42px;border-radius:9px;background:var(--panel);flex:0 0 42px;
+  display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--dim);overflow:hidden}
+#mini .art img{width:100%;height:100%;object-fit:cover}
+#mini .meta{flex:1;min-width:0}
+#mini .title{font-size:14px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#mini .sub{font-size:12px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pbtn{width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px}
+.pbtn.main{background:var(--green);color:#04140a;font-size:19px}
+
+/* ---------- full player ---------- */
+#player{position:fixed;inset:0;z-index:40;background:var(--bg);
+  padding:calc(14px + var(--sat)) 22px calc(18px + var(--sab));display:flex;flex-direction:column}
+#player .close{align-self:flex-start;font-size:26px;color:var(--dim);padding:4px 8px}
+#player .part{width:min(72vw,320px);height:min(72vw,320px);margin:18px auto;border-radius:18px;
+  background:var(--panel2);display:flex;align-items:center;justify-content:center;font-size:84px;color:var(--dim);overflow:hidden}
+#player .part img{width:100%;height:100%;object-fit:cover}
+#player h2{margin:8px 0 2px;font-size:21px;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#player .artist{text-align:center;color:var(--dim);font-size:15px;margin-bottom:4px}
+#player .src{text-align:center;color:var(--dim);font-size:12px;margin-bottom:14px}
+.seekrow{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--dim);font-variant-numeric:tabular-nums}
+.seekrow input{flex:1;accent-color:var(--green);height:28px}
+.controls{display:flex;align-items:center;justify-content:center;gap:14px;margin-top:10px}
+.controls .pbtn{width:52px;height:52px;font-size:22px}
+.controls .pbtn.main{width:66px;height:66px;font-size:27px}
+.controls .pbtn.toggled{color:var(--green)}
+.volrow{display:flex;align-items:center;gap:10px;margin-top:8px;color:var(--dim);font-size:14px}
+.volrow input{flex:1;accent-color:var(--green)}
+
+/* ---------- sheet / toast ---------- */
+#sheetWrap{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.55);display:flex;align-items:flex-end}
+#sheet{background:var(--panel);width:100%;border-radius:18px 18px 0 0;padding:14px 16px calc(16px + var(--sab))}
+#sheet h3{margin:4px 0 10px;font-size:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#sheet button{display:block;width:100%;text-align:left;padding:13px 6px;font-size:15.5px;border-bottom:1px solid var(--line)}
+#sheet button:last-child{border-bottom:0}
+#sheet button.danger{color:var(--red)}
+/* ---------- playlist form ---------- */
+#plWrap{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.55);display:flex;align-items:flex-end}
+#plsheet{background:var(--panel);width:100%;border-radius:18px 18px 0 0;padding:14px 16px calc(16px + var(--sab))}
+#plsheet h3{margin:4px 0 10px;font-size:16px}
+#plsheet input{width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--text);
+  border-radius:12px;padding:12px 14px;outline:none;font-size:16px}
+.plrow{display:flex;gap:10px;margin-top:12px}
+.plrow button{flex:1;padding:12px;border-radius:12px;background:var(--panel2);border:1px solid var(--line);font-size:15px}
+.plrow button.primary{background:var(--green);border-color:var(--green);color:#04140a;font-weight:700}
+
+#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(96px + var(--sab));z-index:60;
+  background:#1c2740;border:1px solid var(--line);color:var(--text);font-size:14px;
+  padding:10px 16px;border-radius:999px;max-width:88vw;text-align:center;box-shadow:0 8px 24px rgba(0,0,0,.5)}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="logo">L</div>
+    <h1>Localify<small>Local files only · no YouTube · no streaming</small></h1>
+    <button class="addbtn" id="btn-add">+ Add music</button>
+  </div>
+  <div class="searchrow">
+    <input id="search" type="search" placeholder="Search your library…" autocomplete="off">
+    <select id="sort" aria-label="Sort">
+      <option value="title">Title A–Z</option>
+      <option value="artist">Artist A–Z</option>
+      <option value="recent">Recently added</option>
+      <option value="size-desc">Largest first</option>
+    </select>
+  </div>
+  <div class="chips" id="chips"></div>
+</header>
+
+<div id="importbar" class="hidden">
+  <div class="row"><b id="ib-name">Adding music…</b><span id="ib-count">0 / 0</span></div>
+  <div class="track"><i id="ib-fill"></i></div>
+</div>
+
+<main id="main"></main>
+
+<div id="mini" class="hidden">
+  <div class="art" id="mini-art">♪</div>
+  <div class="meta" id="mini-meta">
+    <div class="title" id="mini-title">Nothing playing</div>
+    <div class="sub" id="mini-sub">Pick a song to start</div>
+  </div>
+  <button class="pbtn" id="mini-prev" aria-label="Previous">⏮</button>
+  <button class="pbtn main" id="mini-play" aria-label="Play or pause">▶</button>
+  <button class="pbtn" id="mini-next" aria-label="Next">⏭</button>
+</div>
+
+<div id="player" class="hidden">
+  <button class="close" id="p-close" aria-label="Close player">⌄</button>
+  <div class="part" id="p-art">♪</div>
+  <h2 id="p-title">Nothing playing</h2>
+  <div class="artist" id="p-artist"></div>
+  <div class="src" id="p-src">On this device</div>
+  <div class="seekrow">
+    <span id="p-cur">0:00</span>
+    <input id="p-seek" type="range" min="0" max="1000" value="0">
+    <span id="p-dur">0:00</span>
+  </div>
+  <div class="controls">
+    <button class="pbtn" id="p-shuffle" aria-label="Shuffle">🔀</button>
+    <button class="pbtn" id="p-prev" aria-label="Previous">⏮</button>
+    <button class="pbtn main" id="p-play" aria-label="Play or pause">▶</button>
+    <button class="pbtn" id="p-next" aria-label="Next">⏭</button>
+    <button class="pbtn" id="p-repeat" aria-label="Repeat">🔁</button>
+  </div>
+  <div class="volrow"><span>🔈</span><input id="p-vol" type="range" min="0" max="100" value="90"><span>🔊</span></div>
+</div>
+
+<div id="plWrap" class="hidden"><div id="plsheet">
+  <h3>New playlist</h3>
+  <input id="pl-name" type="text" placeholder="Playlist name" maxlength="60" autocomplete="off">
+  <div class="plrow"><button id="pl-cancel">Cancel</button><button id="pl-create" class="primary">Create</button></div>
+</div></div>
+<div id="sheetWrap" class="hidden"><div id="sheet"></div></div>
+<div id="toast" class="hidden"></div>
+
+<input type="file" id="file-input" class="hidden" multiple
+  accept="audio/*,.mp3,.flac,.wav,.ogg,.oga,.m4a,.aac,.opus,.wma,.webm,.aif,.aiff">
+<audio id="audio" preload="metadata" playsinline></audio>
+
+<script>
+'use strict';
+/*
+ * Localify Local — iPhone / Safari build (local files only)
+ * =========================================================
+ * Why this build exists:
+ *  - No Mac / Xcode, so no native app: this is a single HTML file for Safari.
+ *    Add it to the Home Screen and it behaves like an app.
+ *  - YouTube is gone entirely: no search, no streaming, no downloads,
+ *    no artwork/id "backfill" phoning YouTube. Local files only.
+ *
+ * Why the old build crashed Safari on 600 MB – 1.5 GB WAVs (fixed here):
+ *  1. Loudness normalisation ran on every play: it took the whole
+ *     file's arrayBuffer and ran the Web Audio decode call on it.
+ *     That copies the WHOLE file into RAM, then decodes it to Float32 PCM.
+ *     A 1.5 GB WAV decodes to roughly 3 GB of samples — iOS kills the tab.
+ *     -> This build never decodes audio in JS. No decodeAudioData, ever.
+ *  2. Imports copied the whole file into IndexedDB in one transaction.
+ *     Safari will not reliably store a 600 MB–1.5 GB blob for a web page.
+ *     -> Files up to PERSIST_LIMIT are stored so they survive a reload.
+ *        Larger files are NEVER copied: they play from the File you picked,
+ *        for this session, and only their name/artist/duration are saved.
+ *        Re-pick the same file later and it re-attaches automatically
+ *        (matched by name + size). This is a Safari limit, not a choice:
+ *        web pages on iOS get no persistent handle to a file in Files.
+ *  3. There is exactly ONE <audio> element and ONE object URL alive at a
+ *     time. No standby/crossfade deck pre-loading the next huge file,
+ *     no pre-buffering, no hidden copies.
+ *  Tag reading is paged (64 KB slices via blob.slice), including a WAV
+ *  chunk walk that jumps over the data chunk instead of reading it, so
+ *  reading the tags of a 1.5 GB WAV touches only a few KB. RF64 WAVs
+ *  (data size in a ds64 chunk) are handled too.
+ */
+
+const PERSIST_LIMIT = 150 * 1024 * 1024; /* 150 MB: at/above this, session-only */
+const AUDIO_EXT = /\.(mp3|flac|wav|ogg|oga|m4a|aac|opus|wma|webm|aif|aiff)$/i;
+const $ = (s) => document.querySelector(s);
+const audio = $('#audio');
+
+/* ================= storage (metadata + small files only) ================= */
+const DB = (() => {
+  let p = null;
+  function open() {
+    if (p) return p;
+    p = new Promise((resolve, reject) => {
+      const req = indexedDB.open('localify-local', 1);
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        db.createObjectStore('tracks', { keyPath: 'id' });
+        db.createObjectStore('files',  { keyPath: 'id' });
+        db.createObjectStore('covers', { keyPath: 'id' });
+        db.createObjectStore('meta',   { keyPath: 'key' });
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+    return p;
+  }
+  const wrap = (r) => new Promise((res, rej) => { r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+  async function store(name, mode) { const db = await open(); return db.transaction(name, mode).objectStore(name); }
+  return {
+    get:    async (n, k) => wrap((await store(n, 'readonly')).get(k)),
+    getAll: async (n)    => wrap((await store(n, 'readonly')).getAll()),
+    keys:   async (n)    => wrap((await store(n, 'readonly')).getAllKeys()),
+    put:    async (n, v) => wrap((await store(n, 'readwrite')).put(v)),
+    del:    async (n, k) => wrap((await store(n, 'readwrite')).delete(k)),
+  };
+})();
+
+/* ================= state ================= */
+const state = {
+  songs: [],            // metadata records only (never a whole large file)
+  byId: new Map(),
+  favorites: new Set(),
+  playlists: [],        // {name, ids:[]}
+  filter: 'all',        // all | fav | pl:<index>
+  sort: 'title',
+  query: '',
+  queue: [], qIndex: -1,
+  shuffle: false, repeat: 'off', // off | all | one
+  importing: null,
+  currentId: null,
+};
+const sessionFiles = new Map();  // id -> File/Blob held in memory for this session only
+const coverUrls = new Map();     // id -> object URL for a (small) cover image
+let currentUrl = null;           // the ONE live audio object URL
+let playToken = 0;
+
+function saveMeta() {
+  DB.put('meta', { key: 'app', value: {
+    favorites: [...state.favorites],
+    playlists: state.playlists,
+    sort: state.sort, shuffle: state.shuffle, repeat: state.repeat,
+    volume: audio.volume, currentId: state.currentId,
+  }}).catch(() => {});
+}
+async function loadMeta() {
+  try {
+    const row = await DB.get('meta', 'app');
+    const v = (row && row.value) || {};
+    state.favorites = new Set(v.favorites || []);
+    state.playlists = Array.isArray(v.playlists) ? v.playlists : [];
+    state.sort = v.sort || 'title';
+    state.shuffle = !!v.shuffle; state.repeat = v.repeat || 'off';
+    if (typeof v.volume === 'number') { audio.volume = v.volume; $('#p-vol').value = Math.round(v.volume * 100); }
+    state.currentId = v.currentId || null;
+  } catch (e) { /* first run */ }
+}
+
+/* ================= tiny helpers ================= */
+const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) =>
+  ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+function fmtTime(sec) {
+  sec = Math.max(0, Math.floor(Number(sec) || 0));
+  const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
+  return (h ? h + ':' + String(m).padStart(2, '0') : m) + ':' + String(s).padStart(2, '0');
+}
+function fmtSize(bytes) {
+  if (!bytes) return '';
+  const u = ['B', 'KB', 'MB', 'GB']; let n = bytes, i = 0;
+  while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; }
+  return n.toFixed(n >= 100 || i === 0 ? 0 : 1) + ' ' + u[i];
+}
+function cleanName(name) {
+  return String(name || '').replace(/\.[^.]+$/, '').replace(/[_]+/g, ' ').trim();
+}
+let toastTimer = 0;
+function toast(msg) {
+  const el = $('#toast'); el.textContent = msg; el.classList.remove('hidden');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.add('hidden'), 3200);
+}
+const tick = () => new Promise((r) => setTimeout(r, 0));
+
+function fileId(file) {
+  const key = `${file.name}|${file.size}|${file.lastModified || 0}`;
+  let h1 = 0xdeadbeef ^ key.length, h2 = 0x41c6ce57 ^ key.length;
+  for (let i = 0; i < key.length; i++) {
+    const ch = key.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761); h2 = Math.imul(h2 ^ ch, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return 's' + (h2 >>> 0).toString(36) + (h1 >>> 0).toString(36);
+}
+
+/* ================= paged tag reading (never loads a whole file) ================= */
+const PAGE = 64 * 1024;
+class SliceReader {
+  constructor(blob) { this.blob = blob; this.size = blob.size; }
+  async read(pos, len) {
+    if (pos < 0 || pos >= this.size || len <= 0) return new Uint8Array(0);
+    len = Math.min(len, this.size - pos);
+    return new Uint8Array(await this.blob.slice(pos, pos + len).arrayBuffer());
+  }
+}
+const u16le = (b, o) => b[o] | (b[o + 1] << 8);
+const u32le = (b, o) => (b[o] | (b[o + 1] << 8) | (b[o + 2] << 16) | (b[o + 3] << 24)) >>> 0;
+const u32be = (b, o) => ((b[o] << 24) | (b[o + 1] << 16) | (b[o + 2] << 8) | b[o + 3]) >>> 0;
+const u64le = (b, o) => Number((BigInt(u32le(b, o + 4)) << 32n) | BigInt(u32le(b, o)));
+function txt(b, a, z, label) {
+  if (z > b.length) z = b.length; if (z <= a) return '';
+  try { return new TextDecoder(label || 'windows-1252').decode(b.subarray(a, z)); }
+  catch (e) { return new TextDecoder('utf-8').decode(b.subarray(a, z)); }
+}
+
+/* WAV / RF64: walk chunk headers only — the data chunk is jumped over. */
+async function parseWav(r) {
+  const h = await r.read(0, 12);
+  const magic = txt(h, 0, 4);
+  if ((magic !== 'RIFF' && magic !== 'RF64') || txt(h, 8, 12) !== 'WAVE') throw new Error('not wav');
+  let pos = 12, byteRate = 0, blockAlign = 0, sampleRate = 0;
+  let dataLen = 0, dataStart = 0, ds64DataSize = 0;
+  const res = {};
+  for (let guard = 0; guard < 128 && pos + 8 <= r.size; guard++) {
+    const ch = await r.read(pos, 8);
+    if (ch.length < 8) break;
+    const id = txt(ch, 0, 4);
+    let len = u32le(ch, 4);
+    if (id === 'ds64' && len >= 28) {
+      const b = await r.read(pos + 8, 28);
+      ds64DataSize = u64le(b, 8); /* riffSize@0, dataSize@8, sampleCount@16 */
+    } else if (id === 'fmt ') {
+      const b = await r.read(pos + 8, Math.min(len, 40));
+      if (b.length >= 16) {
+        sampleRate = u32le(b, 4); byteRate = u32le(b, 8); blockAlign = u16le(b, 12);
+      }
+    } else if (id === 'data') {
+      dataStart = pos + 8;
+      dataLen = (len === 0xFFFFFFFF || len === 0) ? (ds64DataSize || (r.size - dataStart)) : len;
+      /* Titles etc. can still follow in some files, but nothing after data
+         is worth seeking past gigabytes for — stop here. */
+      break;
+    } else if (id === 'LIST') {
+      const b = await r.read(pos + 8, Math.min(len, 8192));
+      if (txt(b, 0, 4) === 'INFO') {
+        let o = 4;
+        while (o + 8 <= b.length) {
+          const k = txt(b, o, o + 4), l = u32le(b, o + 4);
+          const v = txt(b, o + 8, o + 8 + l, 'utf-8').replace(/\0+$/g, '').trim();
+          if (k === 'INAM') res.title = v; else if (k === 'IART') res.artist = v;
+          else if (k === 'IPRD') res.album = v;
+          o += 8 + l + (l & 1 ? 1 : 0);
+        }
+      }
+    } else if (id === 'id3 ' || id === 'ID3 ') {
+      const got = await parseId3At(r, pos + 8);
+      Object.assign(res, got);
+    }
+    if (len === 0xFFFFFFFF) break;
+    pos += 8 + len + (len & 1 ? 1 : 0);
+  }
+  if (!byteRate && sampleRate && blockAlign) byteRate = sampleRate * blockAlign;
+  res.duration = byteRate && dataLen ? dataLen / byteRate : 0;
+  return res;
+}
+
+/* Minimal ID3v2 text frames (title/artist/album). No picture extraction
+   for big files — a cover is never worth the memory. */
+async function parseId3At(r, start) {
+  const res = {};
+  const h = await r.read(start, 10);
+  if (h.length < 10 || txt(h, 0, 3) !== 'ID3') return res;
+  const size = ((h[6] & 0x7f) << 21) | ((h[7] & 0x7f) << 14) | ((h[8] & 0x7f) << 7) | (h[9] & 0x7f);
+  const body = await r.read(start + 10, Math.min(size, 512 * 1024));
+  let o = 0;
+  const frameSize = (b, p) => (h[3] >= 4)
+    ? (((b[p] & 0x7f) << 21) | ((b[p + 1] & 0x7f) << 14) | ((b[p + 2] & 0x7f) << 7) | (b[p + 3] & 0x7f))
+    : u32be(b, p);
+  while (o + 10 <= body.length) {
+    const id = txt(body, o, o + 4);
+    if (!/^[A-Z0-9]{4}$/.test(id)) break;
+    const len = frameSize(body, o + 4);
+    if (len <= 0 || o + 10 + len > body.length + 10) { /* truncated frame: stop */ }
+    if ((id === 'TIT2' || id === 'TPE1' || id === 'TALB') && len > 1) {
+      const enc = body[o + 10];
+      const label = enc === 3 ? 'utf-8' : enc === 1 ? 'utf-16' : enc === 2 ? 'utf-16be' : 'windows-1252';
+      const v = txt(body, o + 11, o + 10 + len, label).replace(/\0+$/g, '').trim();
+      if (id === 'TIT2') res.title = v; else if (id === 'TPE1') res.artist = v; else res.album = v;
+    }
+    o += 10 + len;
+  }
+  return res;
+}
+
+/* FLAC duration from STREAMINFO (first block only). */
+async function parseFlac(r) {
+  const h = await r.read(0, 8);
+  if (txt(h, 0, 4) !== 'fLaC') throw new Error('not flac');
+  const blockLen = (h[5] << 16) | (h[6] << 8) | h[7];
+  const b = await r.read(8, Math.min(blockLen, 34));
+  if (b.length < 34) return {};
+  const sampleRate = (b[10] << 12) | (b[11] << 4) | (b[12] >> 4);
+  const totalSamples = Number((BigInt(b[13] & 0x0f) << 32n) |
+    BigInt((b[14] << 24) | (b[15] << 16) | (b[16] << 8) | b[17]));
+  return { duration: sampleRate && totalSamples ? totalSamples / sampleRate : 0 };
+}
+
+/* Duration via the browser's own metadata load — it streams headers,
+   it does not hand the file to JS. Used only when no header duration. */
+function probeDuration(file) {
+  return new Promise((resolve) => {
+    const a = new Audio();
+    const url = URL.createObjectURL(file);
+    let done = false;
+    const finish = (d) => { if (done) return; done = true; URL.revokeObjectURL(url); a.removeAttribute('src'); resolve(isFinite(d) && d > 0 ? d : 0); };
+    a.preload = 'metadata';
+    a.onloadedmetadata = () => finish(a.duration);
+    a.onerror = () => finish(0);
+    setTimeout(() => finish(a.duration || 0), 8000);
+    a.src = url;
+  });
+}
+
+async function readTags(file) {
+  const r = new SliceReader(file);
+  const lower = file.name.toLowerCase();
+  let info = {};
+  try {
+    if (lower.endsWith('.wav') || lower.endsWith('.aif') || lower.endsWith('.aiff')) info = await parseWav(r);
+    else if (lower.endsWith('.flac')) info = await parseFlac(r);
+    else if (lower.endsWith('.mp3')) info = await parseId3At(r, 0);
+  } catch (e) { info = {}; }
+  let duration = info.duration || 0;
+  if (!duration) duration = await probeDuration(file);
+  return {
+    title: (info.title || '').trim() || cleanName(file.name) || 'Untitled',
+    artist: (info.artist || '').trim() || 'Unknown Artist',
+    album: (info.album || '').trim() || '',
+    duration: Math.round((duration || 0) * 10) / 10,
+  };
+}
+
+/* ================= import ================= */
+function renderImport() {
+  const bar = $('#importbar');
+  if (!state.importing) { bar.classList.add('hidden'); return; }
+  bar.classList.remove('hidden');
+  const { done, total, name } = state.importing;
+  $('#ib-name').textContent = 'Adding: ' + (name || '');
+  $('#ib-count').textContent = done + ' / ' + total;
+  $('#ib-fill').style.width = (total ? Math.round(done / total * 100) : 0) + '%';
+}
+
+async function importOneFile(file) {
+  const id = fileId(file);
+  /* Re-attach: a saved record (e.g. a session-only large file from a
+     previous visit) with the same name+size gets its file back. */
+  let existing = state.byId.get(id);
+  if (!existing) {
+    existing = state.songs.find((s) => s.needsFile && s.fileName === file.name && s.size === file.size);
+  }
+  if (existing) {
+    sessionFiles.set(existing.id, file);
+    if (existing.needsFile) {
+      existing.needsFile = false;
+      /* If it is small enough to keep after all, store it now. */
+      if (file.size < PERSIST_LIMIT && !existing.persisted) {
+        try { await DB.put('files', { id: existing.id, blob: file }); existing.persisted = true; } catch (e) { /* session-only then */ }
+      }
+      await DB.put('tracks', existing).catch(() => {});
+      render();
+    }
+    return 'attached';
+  }
+  const info = await readTags(file);
+  const large = file.size >= PERSIST_LIMIT;
+  const record = {
+    id, title: info.title, artist: info.artist, album: info.album,
+    duration: info.duration, size: file.size, mime: file.type || '',
+    fileName: file.name, addedAt: Date.now(),
+    persisted: false, sessionOnly: large, needsFile: false,
+  };
+  if (!large) {
+    try { await DB.put('files', { id, blob: file }); record.persisted = true; }
+    catch (e) { record.sessionOnly = true; /* storage full/refused: keep it for this session */ }
+  }
+  sessionFiles.set(id, file);
+  /* Storage must NEVER block an import: on hosts where IndexedDB is
+     unavailable or partitioned (e.g. inside another site's frame), the
+     DB write rejects — the song still plays fine from memory for this
+     session, so a failed write only means "not saved for next visit". */
+  try { await DB.put('tracks', record); }
+  catch (e) { record.sessionOnly = true; console.warn('Track metadata not saved (storage unavailable); playing for this session', e); }
+  state.songs.push(record);
+  state.byId.set(id, record);
+  return large ? 'large' : 'added';
+}
+
+async function importFiles(fileList) {
+  const files = Array.from(fileList || []).filter((f) => f && (AUDIO_EXT.test(f.name) || String(f.type || '').startsWith('audio/')));
+  if (!files.length) { toast('No audio files in that selection'); return; }
+  if (state.importing) { toast('Still adding — one moment'); return; }
+  state.importing = { done: 0, total: files.length, name: files[0].name };
+  renderImport();
+  let added = 0, large = 0, attached = 0, failed = 0;
+  for (const file of files) {
+    state.importing.name = file.name; renderImport();
+    try {
+      const out = await importOneFile(file);
+      if (out === 'added') added++; else if (out === 'large') large++;
+      else if (out === 'attached') attached++;
+    } catch (e) { failed++; console.warn('Could not import', file.name, e); }
+    state.importing.done++; renderImport();
+    await tick(); /* let Safari breathe between files */
+  }
+  state.importing = null; renderImport(); render();
+  const bits = [];
+  if (added) bits.push(added + ' added');
+  if (large) bits.push(large + ' large file' + (large > 1 ? 's' : '') + ' added for this session');
+  if (attached) bits.push(attached + ' re-attached');
+  if (failed) bits.push(failed + ' failed');
+  toast(bits.join(' · ') || 'Nothing new to add');
+  if (large) setTimeout(() => toast('Large files (over ' + fmtSize(PERSIST_LIMIT) + ') play for this session only — Safari can’t store them. Re-add the file next visit and it re-attaches.'), 3600);
+}
+
+/* ================= library rendering ================= */
+function visibleSongs() {
+  let list = state.songs.slice();
+  if (state.filter === 'fav') list = list.filter((s) => state.favorites.has(s.id));
+  else if (state.filter.startsWith('pl:')) {
+    const pl = state.playlists[Number(state.filter.slice(3))];
+    if (pl) { const set = new Set(pl.ids); list = list.filter((s) => set.has(s.id)); }
+  }
+  if (state.query) {
+    const q = state.query.toLowerCase();
+    list = list.filter((s) => (s.title + ' ' + s.artist + ' ' + s.album + ' ' + s.fileName).toLowerCase().includes(q));
+  }
+  const by = state.sort;
+  list.sort((a, b) =>
+    by === 'artist' ? (a.artist + a.title).localeCompare(b.artist + b.title) :
+    by === 'recent' ? (b.addedAt || 0) - (a.addedAt || 0) :
+    by === 'size-desc' ? (b.size || 0) - (a.size || 0) :
+    a.title.localeCompare(b.title));
+  return list;
+}
+
+function renderChips() {
+  const chips = [{ k: 'all', label: 'All songs' }, { k: 'fav', label: '♥ Favorites' }];
+  state.playlists.forEach((pl, i) => chips.push({ k: 'pl:' + i, label: pl.name }));
+  chips.push({ k: '__newpl', label: '+ Playlist' });
+  $('#chips').innerHTML = chips.map((c) =>
+    `<button class="chip ${state.filter === c.k ? 'on' : ''}" data-chip="${esc(c.k)}">${esc(c.label)}</button>`).join('');
+}
+
+function render() {
+  renderChips();
+  const main = $('#main');
+  const list = visibleSongs();
+  if (!state.songs.length) {
+    main.innerHTML = `<div class="empty"><div class="big">🎵</div>
+      <b>Your library is empty</b><br>Tap <b>+ Add music</b> and pick songs from Files
+      (MP3, FLAC, WAV, M4A…). They play right here — offline, no account, no YouTube.
+      <div class="note"><b>Big WAVs welcome:</b> files over ${fmtSize(PERSIST_LIMIT)} (your 600 MB / 1.5 GB ones)
+      are played directly without being copied into the browser, which is what crashed Safari before.
+      They stay playable until you close the page; re-adding the same file later re-attaches it to its saved entry.</div></div>`;
+    return;
+  }
+  if (!list.length) {
+    main.innerHTML = `<div class="empty">Nothing matches here.</div>`;
+    return;
+  }
+  main.innerHTML = list.map((s) => {
+    const playing = s.id === state.currentId;
+    const badge = s.needsFile ? `<span class="badge off">re-add file</span>`
+      : s.sessionOnly ? `<span class="badge">session only · ${fmtSize(s.size)}</span>` : '';
+    return `<div class="song ${playing ? 'playing' : ''}" data-play="${esc(s.id)}">
+      <div class="art">${playing ? '▶' : '♪'}</div>
+      <div class="meta">
+        <div class="title">${esc(s.title)}${badge}</div>
+        <div class="sub">${esc(s.artist)}${s.album ? ' · ' + esc(s.album) : ''} · ${fmtTime(s.duration)} · ${fmtSize(s.size)}</div>
+      </div>
+      <button class="fav ${state.favorites.has(s.id) ? 'on' : ''}" data-fav="${esc(s.id)}" aria-label="Favorite">${state.favorites.has(s.id) ? '♥' : '♡'}</button>
+      <button class="dots" data-menu="${esc(s.id)}" aria-label="More">⋯</button>
+    </div>`;
+  }).join('');
+}
+
+/* ================= playback (one element, one URL, no decoding) ================= */
+function currentSong() { return state.byId.get(state.currentId) || null; }
+
+async function getPlayableFile(song) {
+  if (sessionFiles.has(song.id)) return sessionFiles.get(song.id);
+  if (!song.persisted) return null;
+  const row = await DB.get('files', song.id).catch(() => null);
+  if (row && row.blob) { sessionFiles.set(song.id, row.blob); return row.blob; }
+  return null;
+}
+
+async function playSong(id, queue) {
+  const song = state.byId.get(id);
+  if (!song) return;
+  if (queue) { state.queue = queue.map((s) => s.id); state.qIndex = state.queue.indexOf(id); }
+  const token = ++playToken;
+  const file = await getPlayableFile(song);
+  if (token !== playToken) return;
+  if (!file) {
+    song.needsFile = true; render();
+    toast('“' + song.title + '” is a large/session file — tap + Add music and pick it again to play it');
+    $('#file-input').click();
+    return;
+  }
+  if (currentUrl) { URL.revokeObjectURL(currentUrl); currentUrl = null; }
+  currentUrl = URL.createObjectURL(file);   /* native streaming playback; the file is never copied into JS memory */
+  state.currentId = id;
+  audio.src = currentUrl;
+  audio.play().catch(() => {});
+  saveMeta(); render(); updatePlayerUI();
+}
+
+function playAt(index) {
+  if (!state.queue.length) return;
+  const n = state.queue.length;
+  const at = ((index % n) + n) % n;
+  state.qIndex = at;
+  playSong(state.queue[at]);
+}
+function next(auto) {
+  if (!state.queue.length) return;
+  if (auto && state.repeat === 'one') { audio.currentTime = 0; audio.play().catch(() => {}); return; }
+  let at;
+  if (state.shuffle && state.queue.length > 1) {
+    do { at = Math.floor(Math.random() * state.queue.length); } while (at === state.qIndex);
+  } else at = state.qIndex + 1;
+  if (at >= state.queue.length) {
+    if (auto && state.repeat !== 'all') { updatePlayerUI(); return; }
+    at = 0;
+  }
+  playAt(at);
+}
+function prev() {
+  if (audio.currentTime > 3) { audio.currentTime = 0; return; }
+  playAt(state.qIndex - 1);
+}
+
+/* ================= player UI ================= */
+function updatePlayerUI() {
+  const s = currentSong();
+  const playing = !audio.paused && !audio.ended && !!s;
+  $('#mini').classList.toggle('hidden', !s);
+  if (!s) return;
+  $('#mini-title').textContent = s.title;
+  $('#mini-sub').textContent = s.artist + (s.sessionOnly ? ' · session file' : '');
+  const label = playing ? '⏸' : '▶';
+  $('#mini-play').textContent = label; $('#p-play').textContent = label;
+  $('#p-title').textContent = s.title;
+  $('#p-artist').textContent = s.artist + (s.album ? ' — ' + s.album : '');
+  $('#p-src').textContent = 'On this device · ' + fmtSize(s.size) + (s.sessionOnly ? ' · plays for this session (not stored)' : ' · stored on this device');
+  $('#p-shuffle').classList.toggle('toggled', state.shuffle);
+  $('#p-repeat').classList.toggle('toggled', state.repeat !== 'off');
+  $('#p-repeat').textContent = state.repeat === 'one' ? '🔂' : '🔁';
+  if ('mediaSession' in navigator) {
+    try {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: s.title, artist: s.artist, album: s.album || '',
+      });
+      navigator.mediaSession.playbackState = playing ? 'playing' : 'paused';
+    } catch (e) { /* ignore */ }
+  }
+  render();
+}
+
+/* ================= playlist form (no prompt(): dialogs are blocked in some embedded frames) ================= */
+function showPlForm() {
+  $('#plWrap').classList.remove('hidden');
+  const inp = $('#pl-name'); inp.value = '';
+  setTimeout(() => inp.focus(), 60);
+}
+function hidePlForm() { $('#plWrap').classList.add('hidden'); }
+function createPlFromForm() {
+  const name = $('#pl-name').value.trim();
+  if (!name) { hidePlForm(); return; }
+  state.playlists.push({ name, ids: [] });
+  state.filter = 'pl:' + (state.playlists.length - 1);
+  saveMeta(); hidePlForm(); render();
+}
+
+/* ================= song menu ================= */
+let sheetSongId = null;
+function openMenu(id) {
+  sheetSongId = id;
+  const s = state.byId.get(id); if (!s) return;
+  const plBtns = state.playlists.map((pl, i) =>
+    `<button data-act="addpl" data-pl="${i}">Add to “${esc(pl.name)}”</button>`).join('');
+  $('#sheet').innerHTML = `<h3>${esc(s.title)}</h3>
+    <button data-act="play">Play</button>
+    <button data-act="fav">${state.favorites.has(id) ? 'Remove from Favorites' : 'Add to Favorites'}</button>
+    ${plBtns}
+    <button data-act="remove" class="danger">Remove from library</button>
+    <button data-act="cancel">Cancel</button>`;
+  $('#sheetWrap').classList.remove('hidden');
+}
+function closeMenu() { $('#sheetWrap').classList.add('hidden'); sheetSongId = null; }
+
+async function removeSong(id) {
+  const s = state.byId.get(id); if (!s) return;
+  if (state.currentId === id) { audio.pause(); audio.removeAttribute('src'); if (currentUrl) { URL.revokeObjectURL(currentUrl); currentUrl = null; } state.currentId = null; }
+  sessionFiles.delete(id);
+  state.songs = state.songs.filter((x) => x.id !== id);
+  state.byId.delete(id);
+  state.favorites.delete(id);
+  state.playlists.forEach((pl) => { pl.ids = pl.ids.filter((x) => x !== id); });
+  await DB.del('tracks', id).catch(() => {});
+  await DB.del('files', id).catch(() => {});
+  await DB.del('covers', id).catch(() => {});
+  saveMeta(); render(); updatePlayerUI();
+  toast('Removed “' + s.title + '” (your original file in Files is untouched)');
+}
+
+/* ================= events ================= */
+$('#btn-add').addEventListener('click', () => $('#file-input').click());
+$('#file-input').addEventListener('change', (e) => { importFiles(e.target.files); e.target.value = ''; });
+$('#search').addEventListener('input', (e) => { state.query = e.target.value.trim(); render(); });
+$('#sort').addEventListener('change', (e) => { state.sort = e.target.value; saveMeta(); render(); });
+
+$('#chips').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-chip]'); if (!b) return;
+  const k = b.dataset.chip;
+  if (k === '__newpl') { showPlForm(); return; }
+  state.filter = k; render();
+});
+
+$('#main').addEventListener('click', (e) => {
+  const fav = e.target.closest('[data-fav]');
+  if (fav) {
+    const id = fav.dataset.fav;
+    state.favorites.has(id) ? state.favorites.delete(id) : state.favorites.add(id);
+    saveMeta(); render(); return;
+  }
+  const menu = e.target.closest('[data-menu]');
+  if (menu) { openMenu(menu.dataset.menu); return; }
+  const row = e.target.closest('[data-play]');
+  if (row) playSong(row.dataset.play, visibleSongs());
+});
+
+$('#pl-create').addEventListener('click', createPlFromForm);
+$('#pl-cancel').addEventListener('click', hidePlForm);
+$('#pl-name').addEventListener('keydown', (e) => { if (e.key === 'Enter') createPlFromForm(); });
+$('#plWrap').addEventListener('click', (e) => { if (e.target === $('#plWrap')) hidePlForm(); });
+
+$('#sheetWrap').addEventListener('click', async (e) => {
+  if (e.target === $('#sheetWrap')) { closeMenu(); return; }
+  const b = e.target.closest('[data-act]'); if (!b || !sheetSongId) return;
+  const id = sheetSongId, act = b.dataset.act;
+  closeMenu();
+  if (act === 'play') playSong(id, visibleSongs());
+  else if (act === 'fav') { state.favorites.has(id) ? state.favorites.delete(id) : state.favorites.add(id); saveMeta(); render(); }
+  else if (act === 'addpl') { const pl = state.playlists[Number(b.dataset.pl)]; if (pl && !pl.ids.includes(id)) { pl.ids.push(id); saveMeta(); toast('Added to “' + pl.name + '”'); } }
+  else if (act === 'remove') removeSong(id);
+});
+
+const togglePlay = () => { if (!currentSong()) return; audio.paused ? audio.play().catch(() => {}) : audio.pause(); };
+$('#mini-play').addEventListener('click', (e) => { e.stopPropagation(); togglePlay(); });
+$('#p-play').addEventListener('click', togglePlay);
+$('#mini-next').addEventListener('click', (e) => { e.stopPropagation(); next(false); });
+$('#mini-prev').addEventListener('click', (e) => { e.stopPropagation(); prev(); });
+$('#p-next').addEventListener('click', () => next(false));
+$('#p-prev').addEventListener('click', prev);
+$('#mini-meta').addEventListener('click', () => $('#player').classList.remove('hidden'));
+$('#mini-art').addEventListener('click', () => $('#player').classList.remove('hidden'));
+$('#p-close').addEventListener('click', () => $('#player').classList.add('hidden'));
+$('#p-shuffle').addEventListener('click', () => { state.shuffle = !state.shuffle; saveMeta(); updatePlayerUI(); });
+$('#p-repeat').addEventListener('click', () => {
+  state.repeat = state.repeat === 'off' ? 'all' : state.repeat === 'all' ? 'one' : 'off';
+  saveMeta(); updatePlayerUI(); toast('Repeat: ' + state.repeat);
+});
+$('#p-vol').addEventListener('input', (e) => { audio.volume = e.target.value / 100; saveMeta(); });
+
+let seeking = false;
+$('#p-seek').addEventListener('input', (e) => {
+  seeking = true;
+  if (isFinite(audio.duration) && audio.duration) $('#p-cur').textContent = fmtTime(audio.duration * e.target.value / 1000);
+});
+$('#p-seek').addEventListener('change', (e) => {
+  if (isFinite(audio.duration) && audio.duration) audio.currentTime = audio.duration * e.target.value / 1000;
+  seeking = false;
+});
+audio.addEventListener('timeupdate', () => {
+  if (!seeking && isFinite(audio.duration) && audio.duration) {
+    $('#p-seek').value = Math.round(audio.currentTime / audio.duration * 1000);
+    $('#p-cur').textContent = fmtTime(audio.currentTime);
+    $('#p-dur').textContent = fmtTime(audio.duration);
+    /* If the header duration was missing/wrong, learn the real one. */
+    const s = currentSong();
+    if (s && Math.abs((s.duration || 0) - audio.duration) > 1.5) {
+      s.duration = Math.round(audio.duration * 10) / 10;
+      DB.put('tracks', s).catch(() => {});
+    }
+  }
+});
+audio.addEventListener('play', updatePlayerUI);
+audio.addEventListener('pause', updatePlayerUI);
+audio.addEventListener('ended', () => next(true));
+audio.addEventListener('error', () => {
+  if (state.currentId) toast('That file could not be played — it may have been moved or is in a format Safari can’t decode');
+});
+
+if ('mediaSession' in navigator) {
+  try {
+    navigator.mediaSession.setActionHandler('play', () => audio.play().catch(() => {}));
+    navigator.mediaSession.setActionHandler('pause', () => audio.pause());
+    navigator.mediaSession.setActionHandler('previoustrack', prev);
+    navigator.mediaSession.setActionHandler('nexttrack', () => next(false));
+    navigator.mediaSession.setActionHandler('seekto', (d) => { if (typeof d.seekTime === 'number') audio.currentTime = d.seekTime; });
+  } catch (e) { /* older Safari */ }
+}
+
+/* Drag & drop (desktop convenience; harmless on iPhone) */
+window.addEventListener('dragover', (e) => e.preventDefault());
+window.addEventListener('drop', (e) => { e.preventDefault(); importFiles(e.dataTransfer.files); });
+
+/* ================= boot ================= */
+(async function boot() {
+  await loadMeta();
+  $('#sort').value = state.sort;
+  try {
+    const tracks = await DB.getAll('tracks');
+    const fileKeys = new Set(await DB.keys('files').catch(() => []));
+    for (const t of tracks) {
+      if (!t || !t.id) continue;
+      t.persisted = fileKeys.has(t.id);
+      /* A non-persisted record has no file until it is re-picked. */
+      t.needsFile = !t.persisted;
+      if (t.needsFile) t.sessionOnly = true;
+      state.songs.push(t); state.byId.set(t.id, t);
+    }
+  } catch (e) { console.warn('Library load failed', e); }
+  render(); updatePlayerUI();
+  if (state.songs.some((s) => s.needsFile)) {
+    toast('Some songs (large/session files) need their file re-picked once — tap + Add music and select them again');
+  }
+  try {
+    if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
+  } catch (e) { /* ignore */ }
+})();
+</script>
+</body>
+</html>
