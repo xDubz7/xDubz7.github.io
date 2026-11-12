@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Localify — Stage Preview</title>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;background:#05070c;color:#e8ecf4;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    padding:calc(16px + env(safe-area-inset-top)) 14px calc(28px + env(safe-area-inset-bottom))}
+  h1{font-size:20px;margin:2px 0 4px}
+  .sub{color:#93a0b4;font-size:13.5px;line-height:1.5;margin:0 0 16px}
+  .card{background:#0b0f16;border:1px solid #1c2434;border-radius:14px;padding:12px 12px 10px;margin-bottom:14px}
+  .lab{display:flex;align-items:center;gap:9px;font-size:15.5px;font-weight:700;margin-bottom:8px}
+  .letter{background:#1ed760;color:#04140a;font-weight:900;border-radius:8px;padding:2px 9px;font-size:15px}
+  canvas{display:block;width:100%;aspect-ratio:1/1}
+  .note{color:#93a0b4;font-size:12.5px;line-height:1.5;margin:8px 0 2px}
+  .foot{color:#93a0b4;font-size:13px;line-height:1.55;margin-top:4px}
+  b{color:#e8ecf4}
+</style>
+</head>
+<body>
+<h1>Stage Preview — visualizers for the artwork square</h1>
+<p class="sub">Five ideas for the big square where the song cover lives, all animated by the
+<b>same fake 150 BPM mix</b> (intro → build → drop → breakdown → drop, ~32 s loop).
+<b>A, D and E keep the dancer front and center</b> — the 💃 is a stand-in for your theme's
+chibi sprite, which in the real player dances on the beat like she does now.
+<b>B and C replace the artwork outright.</b> Everything here runs on the same precomputed
+band data the player already makes — no live audio routing, so lock-screen playback
+stays safe. Colours here are the classic analyzer gradient; a winner gets your theme's colours.</p>
+
+<div class="card">
+  <div class="lab"><span class="letter">A</span> Dancer Ring — the NCS circle</div>
+  <canvas id="cvA"></canvas>
+  <p class="note">The iconic NoCopyrightSounds / Trap Nation layout: a circular spectrum
+  pulsing around a center emblem — except the emblem is your dancer, standing in the middle
+  of the ring. Yes, it's a cousin of the strip Radial you just removed; that one was a
+  cramped strip with nothing in the center. This is the stage it actually belongs on.
+  The center disc could hold the song's artwork in a circle instead of the dancer, if you prefer.</p>
+</div>
+
+<div class="card">
+  <div class="lab"><span class="letter">B</span> Full-stage spectrum + reflection</div>
+  <canvas id="cvB"></canvas>
+  <p class="note">The Monstercat / AudioMotion look at full size: big spectrum bars with
+  falling peak caps and a glossy floor reflection. The artwork is gone — the spectrum
+  IS the cover.</p>
+</div>
+
+<div class="card">
+  <div class="lab"><span class="letter">C</span> Spectrogram waterfall</div>
+  <canvas id="cvC"></canvas>
+  <p class="note">The last ~8 seconds of sound as a scrolling heat map — bass at the bottom,
+  treble at the top, brightness is loudness. The DJ-software / sound-engineer view.
+  You can literally see the drop arrive.</p>
+</div>
+
+<div class="card">
+  <div class="lab"><span class="letter">D</span> Particle stage</div>
+  <canvas id="cvD"></canvas>
+  <p class="note">The dancer on a dark stage while particles burst off her on the bass hits
+  and drift up like sparks. The busiest of the dancer options — a little concert, not just a meter.</p>
+</div>
+
+<div class="card">
+  <div class="lab"><span class="letter">E</span> Pulse stage — just the dancer</div>
+  <canvas id="cvE"></canvas>
+  <p class="note">The purest form of your idea: dancer big in the center, nothing competing.
+  A soft glow breathes with the bass and a ring pulses out on the beat. Calm, clean,
+  and the cheapest on battery.</p>
+</div>
+
+<p class="foot"><b>Researched and left out:</b> MilkDrop / Butterchurn (the Winamp psychedelic
+classic) — it feeds on a live audio analyser, the exact Web Audio routing Localify removed
+because it killed lock-screen playback; one artist site does drive it from precomputed
+analysis, but it's a heavy WebGL library expecting hundreds of FFT bins at 60 fps, against
+our 24 bands at 10 fps. Wrong fit, honestly noted.<br><br>
+Reply with a letter — or a combination (one for songs with artwork, one without, say).
+Nothing here touches the player until you pick.</p>
+
+<script>
+'use strict';
+/* ---------- one fake mix drives every panel (same as preview 2) ---------- */
+const LOOP = 32, BEAT = 0.4, BAR = 1.6;
+function clamp01(v) { return v < 0 ? 0 : v > 1 ? 1 : v; }
+function mixFrame(t) {
+  t = ((t % LOOP) + LOOP) % LOOP;
+  let center, width, amp;
+  if (t < 6) { center = 6; width = 3.0; amp = 0.34; }
+  else if (t < 12) { const u = (t - 6) / 6; center = 4 + u * 5; width = 3.4; amp = 0.38 + u * 0.4; }
+  else if (t < 20) { center = 3.4; width = 5.0; amp = 1.0; }
+  else if (t < 26) { center = 10; width = 3.0; amp = 0.38; }
+  else { center = 3.4; width = 5.2; amp = 1.0; }
+  const inDrop = (t >= 12 && t < 20) || t >= 26;
+  const ph = t % BEAT;
+  const kick = inDrop ? Math.exp(-ph * 10) : (t >= 10 && t < 12) ? 0.5 * Math.exp(-ph * 10) : 0.25 * Math.exp(-(t % (BEAT * 2)) * 8);
+  const bp = t % BAR;
+  const dSnare = Math.min(Math.abs(bp - 0.4), Math.abs(bp - 1.2));
+  const snare = inDrop ? Math.exp(-dSnare * 15) : 0;
+  const hat = (t % 0.2) < 0.06 ? 1 : Math.exp(-((t % 0.2)) * 22);
+  const riser = (t >= 10 && t < 12) ? (t - 10) / 2 : 0;
+  const bands = new Array(16);
+  for (let i = 0; i < 16; i++) {
+    let v = amp * Math.exp(-((i - center) * (i - center)) / (2 * width * width)) * 1.55;
+    if (i < 4) v *= inDrop ? (0.42 + 0.85 * kick) : 0.75;
+    if (i >= 5 && i <= 9) v *= 0.72 + 0.55 * snare;
+    if (i >= 11) v *= 0.55 + 0.5 * hat + riser * 0.9 * (i / 15);
+    if (t >= 20 && t < 26 && i >= 9) v *= 1.25;
+    v *= 0.82 + 0.18 * Math.sin(t * (1.3 + i * 0.35) + i * 1.7);
+    bands[i] = clamp01(v);
+  }
+  const avg = (a, b) => { let s = 0; for (let i = a; i <= b; i++) s += bands[i]; return s / (b - a + 1); };
+  return { bands, low: avg(0, 4), mid: avg(5, 10), high: avg(11, 15),
+           kick, level: clamp01(Math.max(...bands) * 1.05) };
+}
+
+/* smoothed band state shared by the panels */
+const sm = new Array(16).fill(0);
+function smoothBands(raw) {
+  for (let i = 0; i < 16; i++) {
+    const k = raw[i] > sm[i] ? 0.55 : 0.16;
+    sm[i] += (raw[i] - sm[i]) * k;
+  }
+}
+function bandAt(x) {
+  const i = Math.max(0, Math.min(14, Math.floor(x)));
+  const f = Math.max(0, Math.min(1, x - i));
+  return sm[i] * (1 - f) + sm[i + 1] * f;
+}
+function colorFor(v) {
+  const stops = [[25, 240, 122], [255, 210, 62], [255, 75, 46]];
+  const u = clamp01(v) * 2, i = Math.min(1, Math.floor(u)), f = u - i;
+  const a = stops[i], b = stops[i + 1];
+  return `rgb(${Math.round(a[0] + (b[0] - a[0]) * f)},${Math.round(a[1] + (b[1] - a[1]) * f)},${Math.round(a[2] + (b[2] - a[2]) * f)})`;
+}
+
+/* ---------- canvas plumbing ---------- */
+const panels = [];
+function reg(id, draw) {
+  const cv = document.getElementById(id);
+  panels.push({ cv, ctx: cv.getContext('2d'), draw, W: 0, H: 0 });
+}
+function fit(p) {
+  const r = p.cv.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  const W = Math.round(r.width * dpr), H = Math.round(r.height * dpr);
+  if (W && (p.cv.width !== W || p.cv.height !== H)) { p.cv.width = W; p.cv.height = H; }
+  p.W = p.cv.width; p.H = p.cv.height; p.dpr = dpr;
+}
+function drawDancer(p, cx, cy, size) {
+  const { ctx } = p;
+  ctx.font = `${size}px "Apple Color Emoji","Segoe UI Emoji",sans-serif`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('💃', cx, cy);
+}
+
+/* ---------- A: Dancer Ring (NCS circle) ---------- */
+reg('cvA', (p, frame) => {
+  const { ctx, W, H } = p; if (!W) return;
+  ctx.clearRect(0, 0, W, H);
+  const cx = W / 2, cy = H / 2, S = Math.min(W, H);
+  const pulse = 1 + frame.low * 0.045;
+  const r0 = S * 0.235 * pulse, maxLen = S * 0.235;
+  const n = 64;
+  ctx.lineCap = 'round';
+  for (let k = 0; k < n; k++) {
+    const v = bandAt((k / (n - 1)) * 15);
+    const a = -Math.PI / 2 + (k / n) * Math.PI * 2;
+    const r1 = r0 + Math.max(0.02, v) * maxLen;
+    ctx.beginPath();
+    ctx.moveTo(cx + Math.cos(a) * r0, cy + Math.sin(a) * r0);
+    ctx.lineTo(cx + Math.cos(a) * r1, cy + Math.sin(a) * r1);
+    ctx.strokeStyle = colorFor(v);
+    ctx.lineWidth = S * 0.011;
+    ctx.stroke();
+  }
+  ctx.beginPath(); ctx.arc(cx, cy, r0 - 6 * p.dpr, 0, Math.PI * 2);
+  ctx.fillStyle = '#0b0f16'; ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,.20)'; ctx.lineWidth = 1.5 * p.dpr; ctx.stroke();
+  drawDancer(p, cx, cy + S * 0.01, S * 0.30);
+});
+
+/* ---------- B: Full-stage spectrum + reflection ---------- */
+const pkB = new Array(32).fill(0), pkHoldB = new Array(32).fill(0);
+reg('cvB', (p) => {
+  const { ctx, W, H } = p; if (!W) return;
+  ctx.clearRect(0, 0, W, H);
+  const n = 32, bw = W / n;
+  const floorY = H * 0.78, maxH = H * 0.72;
+  const g = ctx.createLinearGradient(0, floorY, 0, floorY - maxH);
+  g.addColorStop(0, '#19f07a'); g.addColorStop(0.55, '#c6f542');
+  g.addColorStop(0.8, '#ffd23e'); g.addColorStop(1, '#ff4b2e');
+  ctx.fillStyle = g;
+  for (let i = 0; i < n; i++) {
+    const v = bandAt((i / (n - 1)) * 15);
+    const bh = Math.max(2, v * maxH);
+    ctx.fillRect(i * bw + bw * 0.16, floorY - bh, bw * 0.68, bh);
+    if (v >= pkB[i]) { pkB[i] = v; pkHoldB[i] = 30; }
+    else if (pkHoldB[i] > 0) pkHoldB[i]--;
+    else pkB[i] = Math.max(0, pkB[i] - 0.005);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(i * bw + bw * 0.16, floorY - Math.max(2, pkB[i] * maxH) - 3 * p.dpr, bw * 0.68, 2.4 * p.dpr);
+    ctx.fillStyle = g;
+  }
+  /* floor line + reflection */
+  ctx.fillStyle = 'rgba(255,255,255,.16)';
+  ctx.fillRect(0, floorY, W, Math.max(1, p.dpr));
+  ctx.save();
+  ctx.globalAlpha = 0.16;
+  ctx.translate(0, floorY * 2);
+  ctx.scale(1, -0.30);
+  ctx.fillStyle = g;
+  for (let i = 0; i < n; i++) {
+    const v = bandAt((i / (n - 1)) * 15);
+    const bh = Math.max(2, v * maxH);
+    ctx.fillRect(i * bw + bw * 0.16, floorY - bh, bw * 0.68, bh);
+  }
+  ctx.restore();
+});
+
+/* ---------- C: Spectrogram waterfall ---------- */
+const wfHist = [];
+let wfLast = 0;
+reg('cvC', (p, frame, t) => {
+  const { ctx, W, H } = p; if (!W) return;
+  if (t - wfLast > 0.085) { wfHist.push(sm.slice()); if (wfHist.length > 96) wfHist.shift(); wfLast = t; }
+  ctx.fillStyle = '#05070c';
+  ctx.fillRect(0, 0, W, H);
+  const cols = 96, rows = 16;
+  const cw = W / cols, ch = H / rows;
+  for (let ci = 0; ci < wfHist.length; ci++) {
+    const colBands = wfHist[ci];
+    for (let b = 0; b < rows; b++) {
+      const v = colBands[b];
+      if (v < 0.03) continue;
+      ctx.fillStyle = colorFor(v * 1.05);
+      ctx.globalAlpha = 0.25 + 0.75 * v;
+      ctx.fillRect(ci * cw, H - (b + 1) * ch, Math.max(1, cw - 0.5), Math.max(1, ch - 0.5));
+    }
+  }
+  ctx.globalAlpha = 1;
+});
+
+/* ---------- D: Particle stage ---------- */
+const parts = [];
+let ptLast = 0;
+reg('cvD', (p, frame, t) => {
+  const { ctx, W, H } = p; if (!W) return;
+  ctx.clearRect(0, 0, W, H);
+  const cx = W / 2, cy = H / 2, S = Math.min(W, H);
+  const dt = Math.min(0.05, ptLast ? t - ptLast : 0.016); ptLast = t;
+  /* spawn: steady sparkle + bursts on the kick */
+  const burst = frame.kick > 0.72 ? 10 : 0;
+  const emit = burst + (frame.level > 0.25 ? 2 : 0);
+  for (let i = 0; i < emit && parts.length < 260; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const sp = (0.10 + Math.random() * 0.30) * S * (0.5 + frame.low);
+    parts.push({
+      x: cx + (Math.random() - 0.5) * S * 0.10, y: cy + S * 0.16,
+      vx: Math.cos(a) * sp, vy: -Math.abs(Math.sin(a)) * sp - S * 0.06,
+      life: 1, decay: 0.35 + Math.random() * 0.5,
+      col: colorFor(0.15 + Math.random() * 0.85),
+      r: (1.2 + Math.random() * 2.4) * p.dpr,
+    });
+  }
+  for (let i = parts.length - 1; i >= 0; i--) {
+    const q = parts[i];
+    q.life -= q.decay * dt;
+    if (q.life <= 0) { parts.splice(i, 1); continue; }
+    q.x += q.vx * dt; q.y += q.vy * dt;
+    q.vy -= S * 0.05 * dt; q.vx *= (1 - 0.4 * dt);
+    ctx.globalAlpha = Math.max(0, q.life) * 0.9;
+    ctx.fillStyle = q.col;
+    ctx.beginPath(); ctx.arc(q.x, q.y, q.r, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  /* glow behind the dancer, breathing with the low band */
+  const glowR = S * (0.26 + frame.low * 0.10);
+  const gr = ctx.createRadialGradient(cx, cy, 0, cx, cy, glowR);
+  gr.addColorStop(0, 'rgba(25,240,122,.30)'); gr.addColorStop(1, 'rgba(25,240,122,0)');
+  ctx.fillStyle = gr;
+  ctx.fillRect(cx - glowR, cy - glowR, glowR * 2, glowR * 2);
+  /* floor */
+  ctx.fillStyle = 'rgba(255,255,255,.14)';
+  ctx.fillRect(W * 0.16, cy + S * 0.235, W * 0.68, Math.max(1, p.dpr));
+  drawDancer(p, cx, cy + S * 0.02, S * 0.34);
+});
+
+/* ---------- E: Pulse stage — just the dancer ---------- */
+const rings = [];
+let ringNext = 0;
+reg('cvE', (p, frame, t) => {
+  const { ctx, W, H } = p; if (!W) return;
+  ctx.clearRect(0, 0, W, H);
+  const cx = W / 2, cy = H / 2, S = Math.min(W, H);
+  if (t >= ringNext) { rings.push({ born: t }); ringNext = t + BEAT * 2; }
+  for (let i = rings.length - 1; i >= 0; i--) {
+    const age = (t - rings[i].born) / 1.15;
+    if (age >= 1) { rings.splice(i, 1); continue; }
+    ctx.beginPath();
+    ctx.arc(cx, cy, S * 0.16 + age * S * 0.30, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(25,240,122,${(1 - age) * 0.5})`;
+    ctx.lineWidth = 2.2 * p.dpr;
+    ctx.stroke();
+  }
+  const glowR = S * (0.30 + frame.low * 0.13);
+  const gr = ctx.createRadialGradient(cx, cy, 0, cx, cy, glowR);
+  gr.addColorStop(0, 'rgba(25,240,122,.34)'); gr.addColorStop(1, 'rgba(25,240,122,0)');
+  ctx.fillStyle = gr;
+  ctx.fillRect(cx - glowR, cy - glowR, glowR * 2, glowR * 2);
+  ctx.fillStyle = 'rgba(0,0,0,.35)';
+  ctx.beginPath(); ctx.ellipse(cx, cy + S * 0.235, S * 0.17, S * 0.028, 0, 0, Math.PI * 2); ctx.fill();
+  drawDancer(p, cx, cy, S * 0.42);
+});
+
+/* ---------- main loop ---------- */
+function loop(now) {
+  const t = now / 1000;
+  const frame = mixFrame(t);
+  smoothBands(frame.bands);
+  for (const p of panels) { fit(p); p.draw(p, frame, t); }
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
