@@ -20,6 +20,11 @@
   --red:#ff5c5c; --amber:#ffb84d; --radius:14px;
   --sat:env(safe-area-inset-top,0px); --sab:env(safe-area-inset-bottom,0px);
 }
+/* Hatsune Miku theme: her signature teal, deep-sea panels, pink kept for hearts. */
+[data-theme="miku"]{
+  --bg:#06100f; --panel:#0b1a19; --panel2:#10302d; --line:#1d4541;
+  --green:#39c5bb; --green-d:#1f9e94; --amber:#ffd166;
+}
 *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
 html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
   font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
@@ -148,6 +153,10 @@ main{padding:12px 12px calc(120px + var(--sab))}
 .eqchip{padding:6px 13px;border-radius:999px;background:var(--panel2);border:1px solid var(--line);
   color:var(--dim);font-size:13px}
 .eqchip.on{background:var(--green);border-color:var(--green);color:#04140a;font-weight:700}
+.tdot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:7px;vertical-align:0}
+.iconbtn{width:40px;height:40px;border-radius:12px;background:var(--panel2);border:1px solid var(--line);
+  color:var(--dim);display:flex;align-items:center;justify-content:center;flex:none}
+.iconbtn svg{width:21px;height:21px}
 .extrarow{display:flex;justify-content:center;margin-top:12px}
 .xbtn{display:flex;align-items:center;gap:7px;padding:8px 16px;border-radius:999px;
   background:var(--panel2);border:1px solid var(--line);color:var(--dim);font-size:13.5px}
@@ -182,6 +191,7 @@ main{padding:12px 12px calc(120px + var(--sab))}
   <div class="brand">
     <div class="logo">L</div>
     <h1>Localify<small>Local files only · no YouTube · no streaming</small></h1>
+    <button class="iconbtn" id="btn-theme" aria-label="Switch theme"></button>
     <button class="addbtn" id="btn-add">+ Add music</button>
   </div>
   <div class="searchrow">
@@ -233,8 +243,8 @@ main{padding:12px 12px calc(120px + var(--sab))}
     <button class="pbtn" id="p-next" aria-label="Next"></button>
     <button class="pbtn" id="p-repeat" aria-label="Repeat"></button>
   </div>
-  <div class="eqrow"><span class="eqlab">EQ</span><div class="eqchips" id="eq-chips">
-    <button data-eq="flat" class="eqchip on">Flat</button><button data-eq="bass" class="eqchip">Bass</button><button data-eq="treble" class="eqchip">Treble</button><button data-eq="vocal" class="eqchip">Vocal</button>
+  <div class="eqrow"><span class="eqlab">THEME</span><div class="eqchips" id="theme-chips">
+    <button data-theme-name="green" class="eqchip on"><span class="tdot" style="background:#1ed760"></span>Localify</button><button data-theme-name="miku" class="eqchip"><span class="tdot" style="background:#39c5bb"></span>Miku</button>
   </div></div>
   <div class="extrarow"><button class="xbtn" id="p-sleep"><span id="sleep-label">Sleep off</span></button></div>
 </div>
@@ -307,6 +317,7 @@ const ICON_INNER = {
   volHigh: '<path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>',
   note: '<path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>',
   moon: '<path d="M12 3a9 9 0 1 0 9 9c0-.46-.04-.92-.1-1.36a5.39 5.39 0 0 1-4.4 2.26 5.5 5.5 0 0 1-5.5-5.5c0-1.81.89-3.42 2.26-4.4C12.92 3.04 12.46 3 12 3z"/>',
+  palette: '<path d="M12 2.7c3.2 4 5.6 6.9 5.6 9.8a5.6 5.6 0 1 1-11.2 0C6.4 9.6 8.8 6.7 12 2.7z"/>',
 };
 function icon(name) {
   return '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">' + (ICON_INNER[name] || '') + '</svg>';
@@ -353,7 +364,7 @@ const state = {
   query: '',
   queue: [], qIndex: -1,
   shuffle: false, repeat: 'off', // off | all | one
-  eq: 'flat',
+  theme: 'green',
   importing: null,
   currentId: null,
 };
@@ -367,7 +378,7 @@ function saveMeta() {
     favorites: [...state.favorites],
     playlists: state.playlists,
     sort: state.sort, shuffle: state.shuffle, repeat: state.repeat,
-    eq: state.eq, currentId: state.currentId,
+    theme: state.theme, currentId: state.currentId,
   }}).catch(() => {});
 }
 async function loadMeta() {
@@ -378,7 +389,7 @@ async function loadMeta() {
     state.playlists = Array.isArray(v.playlists) ? v.playlists : [];
     state.sort = v.sort || 'title';
     state.shuffle = !!v.shuffle; state.repeat = v.repeat || 'off';
-    state.eq = v.eq || 'flat';
+    state.theme = v.theme || 'green';
     state.currentId = v.currentId || null;
   } catch (e) { /* first run */ }
 }
@@ -498,7 +509,7 @@ async function parseWav(r) {
    bucket position (a few KB read per bucket, never the whole file — the
    1.5 GB case reads ~15 MB total in slices). Peaks are 0..1 floats. */
 async function computeWavPeaks(r, info, buckets) {
-  buckets = buckets || 240;
+  buckets = buckets || 480;
   if (!info || !info.dataStart || !info.dataLen || !info.blockAlign) return null;
   const bits = info.bitsPerSample || 0;
   const fmt = info.audioFormat || 1;
@@ -779,61 +790,56 @@ function render() {
   }).join('');
 }
 
-/* ================= Web Audio graph: EQ + waveform analyser =================
- * The <audio> element streams through an AudioContext: three EQ filters,
- * then an AnalyserNode that lets the waveform bounce with the actual music
- * while it plays. Streaming through a graph does NOT decode the file into
- * memory, so big WAVs stay safe. (There is deliberately no volume control
- * here — iOS leaves volume to the hardware buttons, and Gabriel found the
- * fader unnecessary; the element plays at full level.)
- * The graph is created lazily inside a user gesture (tap), as iOS requires. */
-let AC = null, eqNodes = [], analyserNode = null, waveData = null;
-const EQ_PRESETS = {
-  flat:   [0, 0, 0],
-  bass:   [8, 2, -2],
-  treble: [-2, 2, 8],
-  vocal:  [-3, 6, -2],
-};
-function ensureAudioGraph() {
-  if (AC) { if (AC.state === 'suspended') AC.resume().catch(() => {}); return true; }
-  try {
-    const Ctx = window.AudioContext || window.webkitAudioContext;
-    if (!Ctx) return false;
-    AC = new Ctx();
-    const src = AC.createMediaElementSource(audio);
-    const low = AC.createBiquadFilter();  low.type = 'lowshelf';  low.frequency.value = 200;
-    const mid = AC.createBiquadFilter();  mid.type = 'peaking';   mid.frequency.value = 1000; mid.Q.value = 0.6;
-    const high = AC.createBiquadFilter(); high.type = 'highshelf'; high.frequency.value = 4000;
-    analyserNode = AC.createAnalyser(); analyserNode.fftSize = 2048;
-    waveData = new Uint8Array(analyserNode.fftSize);
-    src.connect(low); low.connect(mid); mid.connect(high); high.connect(analyserNode); analyserNode.connect(AC.destination);
-    eqNodes = [low, mid, high];
-    applyEq(state.eq);
-    if (AC.state === 'suspended') AC.resume().catch(() => {});
-    return true;
-  } catch (e) { AC = null; return false; }
+/* ================= playback path note =================
+ * NOTE (v4): there is deliberately NO Web Audio routing any more. Routing
+ * the element through an AudioContext (done in v2/v3 for the volume fader,
+ * EQ and the analyser) broke lock-screen playback: iOS suspends the
+ * AudioContext when the phone locks, so the song kept "playing" in the UI
+ * but went silent. A plain <audio> element plays on with the screen off,
+ * which is what a music player is for. The EQ went with the graph; the
+ * waveform animation now runs off the song's own stored peaks instead. */
+
+/* ================= themes =================
+ * 'green' = the Localify green. 'miku' = Hatsune Miku teal (#39c5bb) with
+ * pink kept for hearts. The choice recolours the whole UI via the CSS
+ * variables and the waveform via peakColor(). Saved between launches. */
+let peakColorCache = {};
+function applyTheme(name, save = true) {
+  state.theme = (name === 'miku') ? 'miku' : 'green';
+  document.documentElement.setAttribute('data-theme', state.theme);
+  peakColorCache = {};
+  document.querySelectorAll('#theme-chips .eqchip').forEach((c) =>
+    c.classList.toggle('on', c.dataset.themeName === state.theme));
+  if (save) saveMeta();
+  if (!$('#player').classList.contains('hidden')) drawWave();
 }
-/* Live loudness of what's playing right now (0..1), from the analyser.
-   Zero when the graph isn't running (e.g. before the first tap). */
-function audioLevel() {
-  if (!analyserNode || !waveData) return 0;
-  try {
-    analyserNode.getByteTimeDomainData(waveData);
-    let sum = 0;
-    for (let i = 0; i < waveData.length; i += 4) { const d = (waveData[i] - 128) / 128; sum += d * d; }
-    return Math.min(1, Math.sqrt(sum / (waveData.length / 4)) * 3.2);
-  } catch (e) { return 0; }
-}
-function applyEq(name) {
-  const vals = EQ_PRESETS[name] || EQ_PRESETS.flat;
-  if (eqNodes.length && AC) eqNodes.forEach((n, i) => n.gain.setTargetAtTime(vals[i], AC.currentTime, 0.05));
-  document.querySelectorAll('#eq-chips .eqchip').forEach((c) => c.classList.toggle('on', c.dataset.eq === name));
+
+/* Bar colour for a played waveform peak, by loudness — the look from
+ * Gabriel's reference video: quiet bars violet/blue, mid bars cyan/green,
+ * loud bars pink/red. In the Miku theme the same loudness scale runs
+ * teal -> pale cyan -> Miku pink. Colours are cached per loudness step. */
+function peakColor(p) {
+  const q = Math.round(Math.min(1, Math.max(0, p)) * 24);
+  const key = state.theme + ':' + q;
+  if (peakColorCache[key]) return peakColorCache[key];
+  const t = q / 24;
+  let c;
+  if (state.theme === 'miku') {
+    const stops = [[57, 197, 187], [127, 231, 220], [255, 123, 172]];
+    const seg = t < 0.7 ? 0 : 1, lt = t < 0.7 ? t / 0.7 : (t - 0.7) / 0.3;
+    const a = stops[seg], b = stops[seg + 1];
+    c = `rgb(${Math.round(a[0] + (b[0] - a[0]) * lt)},${Math.round(a[1] + (b[1] - a[1]) * lt)},${Math.round(a[2] + (b[2] - a[2]) * lt)})`;
+  } else {
+    c = `hsl(${Math.round((275 - t * 280 + 360) % 360)} 85% 60%)`;
+  }
+  peakColorCache[key] = c;
+  return c;
 }
 
 /* Songs imported before waveforms existed get theirs computed lazily
    the first time they play (WAV only, sampled — see computeWavPeaks). */
 async function ensurePeaks(song, file) {
-  if (song.peaks || song._peaksBusy) return;
+  if ((song.peaks && song.peaks.length >= 480) || song._peaksBusy) return;
   if (!/\.wav$/i.test(song.fileName || '')) return;
   song._peaksBusy = true;
   try {
@@ -875,7 +881,6 @@ async function playSong(id, queue) {
   currentUrl = URL.createObjectURL(file);   /* native streaming playback; the file is never copied into JS memory */
   state.currentId = id;
   audio.src = currentUrl;
-  if (AC && AC.state === 'suspended') AC.resume().catch(() => {});
   audio.play().catch(() => {});
   ensurePeaks(song, file);
   saveMeta(); render(); updatePlayerUI();
@@ -937,45 +942,40 @@ function drawWave() {
   const ctx = wctx, mid = H / 2;
   ctx.clearRect(0, 0, W, H);
   const f = (isFinite(audio.duration) && audio.duration) ? Math.min(1, Math.max(0, audio.currentTime / audio.duration)) : 0;
-  const GREEN = '#1ed760', REST = '#42506e';
-  if (s.peaks && s.peaks.length) {
-    const n = s.peaks.length, bw = W / n;
-    /* Animation (the original's wave "ripples and flows while a song plays,
-       and rests when paused"): while playing, bars near the playhead bounce
-       with the ACTUAL loudness coming through the analyser right now. */
-    const playingNow = !audio.paused && !audio.ended;
-    if (playingNow) waveLevel += (audioLevel() - waveLevel) * 0.35; else waveLevel *= 0.8;
-    const playBucket = f * n, nowMs = performance.now();
-    for (let i = 0; i < n; i++) {
-      const p = Math.max(0.05, s.peaks[i]);
-      let bh = p * (H - 8 * dpr);
-      if (waveLevel > 0.02) {
-        const dist = Math.abs(i - playBucket);
-        if (dist < 22) {
-          const boost = waveLevel * (1 - dist / 22) * (0.65 + 0.35 * Math.sin(nowMs / 110 + i * 1.35));
-          bh = Math.min(H - 2 * dpr, bh * (1 + boost * 0.9));
-        }
-      }
-      ctx.fillStyle = (i / n <= f) ? GREEN : REST;
-      ctx.fillRect(i * bw + bw * 0.22, mid - bh / 2, Math.max(1, bw * 0.56), bh);
-    }
-  } else {
-    const N = 90, phase = (!audio.paused && !audio.ended) ? performance.now() / 240 : 0;
+  /* One bar-style waveform for every song (the look from Gabriel's video):
+     dense thin bars, the played part coloured by each bar's loudness and
+     the unplayed part grey. WAVs use their real sampled peaks; other
+     formats use their seeded per-song wave sampled into bars. */
+  let disp = s.peaks;
+  if (!disp || !disp.length) {
+    disp = [];
     const seedText = s.id + '|' + (s.title || '');
-    const draw = (color) => {
-      ctx.beginPath();
-      for (let i = 0; i <= N; i++) {
-        const t = i / N, x = t * W, y = mid - ribbonAmp(seedText, t, phase) * H * 0.36;
-        i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+    for (let i = 0; i < 240; i++) disp.push(ribbonAmp(seedText, i / 240, 0));
+  }
+  const n = disp.length, bw = W / n;
+  const REST = state.theme === 'miku' ? '#2c4f4b' : '#3d4a63';
+  /* Animation while playing (rests when paused): the bars around the
+     playhead bounce, driven by the song's OWN loudness at the playhead —
+     no audio routing needed, so lock-screen playback stays untouched. */
+  const playingNow = !audio.paused && !audio.ended;
+  const playBucket = f * n;
+  const targetLevel = playingNow ? Math.max(0.12, disp[Math.min(n - 1, Math.floor(playBucket))] || 0) : 0;
+  waveLevel += (targetLevel - waveLevel) * (playingNow ? 0.4 : 0.15);
+  const nowMs = performance.now();
+  ctx.fillStyle = 'rgba(255,255,255,.14)';
+  ctx.fillRect(0, mid - 0.5 * dpr, W, Math.max(1, dpr));
+  for (let i = 0; i < n; i++) {
+    const p = Math.max(0.04, disp[i]);
+    let bh = p * (H - 6 * dpr);
+    if (waveLevel > 0.02) {
+      const dist = Math.abs(i - playBucket);
+      if (dist < 26) {
+        const boost = waveLevel * (1 - dist / 26) * (0.65 + 0.35 * Math.sin(nowMs / 110 + i * 1.35));
+        bh = Math.min(H - 2 * dpr, bh * (1 + boost * 0.9));
       }
-      for (let i = N; i >= 0; i--) {
-        const t = i / N, x = t * W, y = mid + ribbonAmp(seedText, t, phase) * H * 0.14;
-        ctx.lineTo(x, y);
-      }
-      ctx.closePath(); ctx.fillStyle = color; ctx.fill();
-    };
-    draw(REST);
-    if (f > 0) { ctx.save(); ctx.beginPath(); ctx.rect(0, 0, W * f, H); ctx.clip(); draw(GREEN); ctx.restore(); }
+    }
+    ctx.fillStyle = (i / n <= f) ? peakColor(p) : REST;
+    ctx.fillRect(i * bw + bw * 0.18, mid - bh / 2, Math.max(1, bw * 0.6), bh);
   }
   ctx.fillStyle = 'rgba(255,255,255,.9)';
   ctx.fillRect(Math.max(0, Math.round(f * W) - dpr), 2 * dpr, 2 * dpr, H - 4 * dpr);
@@ -1091,12 +1091,10 @@ const FILL_ICONS = {
   'mini-prev': 'prev', 'mini-play': 'play', 'mini-next': 'next',
   'p-prev': 'prev', 'p-play': 'play', 'p-next': 'next',
   'p-shuffle': 'shuffle', 'p-repeat': 'repeat', 'p-close': 'chevD',
-  'mini-art': 'note', 'p-art': 'note',
+  'mini-art': 'note', 'p-art': 'note', 'btn-theme': 'palette',
 };
 for (const id in FILL_ICONS) { const el = document.getElementById(id); if (el) el.innerHTML = icon(FILL_ICONS[id]); }
 $('#p-sleep').insertAdjacentHTML('afterbegin', icon('moon'));
-document.addEventListener('pointerdown', () => { if (AC && AC.state === 'suspended') AC.resume().catch(() => {}); });
-
 $('#btn-add').addEventListener('click', () => $('#file-input').click());
 $('#file-input').addEventListener('change', (e) => { importFiles(e.target.files); e.target.value = ''; });
 $('#search').addEventListener('input', (e) => { state.query = e.target.value.trim(); render(); });
@@ -1119,7 +1117,7 @@ $('#main').addEventListener('click', (e) => {
   const menu = e.target.closest('[data-menu]');
   if (menu) { openMenu(menu.dataset.menu); return; }
   const row = e.target.closest('[data-play]');
-  if (row) { ensureAudioGraph(); playSong(row.dataset.play, visibleSongs()); }
+  if (row) playSong(row.dataset.play, visibleSongs());
 });
 
 $('#pl-create').addEventListener('click', createPlFromForm);
@@ -1132,19 +1130,19 @@ $('#sheetWrap').addEventListener('click', async (e) => {
   const b = e.target.closest('[data-act]'); if (!b || !sheetSongId) return;
   const id = sheetSongId, act = b.dataset.act;
   closeMenu();
-  if (act === 'play') { ensureAudioGraph(); playSong(id, visibleSongs()); }
+  if (act === 'play') playSong(id, visibleSongs());
   else if (act === 'fav') { state.favorites.has(id) ? state.favorites.delete(id) : state.favorites.add(id); saveMeta(); render(); }
   else if (act === 'addpl') { const pl = state.playlists[Number(b.dataset.pl)]; if (pl && !pl.ids.includes(id)) { pl.ids.push(id); saveMeta(); toast('Added to “' + pl.name + '”'); } }
   else if (act === 'remove') removeSong(id);
 });
 
-const togglePlay = () => { if (!currentSong()) return; ensureAudioGraph(); audio.paused ? audio.play().catch(() => {}) : audio.pause(); };
+const togglePlay = () => { if (!currentSong()) return; audio.paused ? audio.play().catch(() => {}) : audio.pause(); };
 $('#mini-play').addEventListener('click', (e) => { e.stopPropagation(); togglePlay(); });
 $('#p-play').addEventListener('click', togglePlay);
-$('#mini-next').addEventListener('click', (e) => { e.stopPropagation(); ensureAudioGraph(); next(false); });
-$('#mini-prev').addEventListener('click', (e) => { e.stopPropagation(); ensureAudioGraph(); prev(); });
-$('#p-next').addEventListener('click', () => { ensureAudioGraph(); next(false); });
-$('#p-prev').addEventListener('click', () => { ensureAudioGraph(); prev(); });
+$('#mini-next').addEventListener('click', (e) => { e.stopPropagation(); next(false); });
+$('#mini-prev').addEventListener('click', (e) => { e.stopPropagation(); prev(); });
+$('#p-next').addEventListener('click', () => next(false));
+$('#p-prev').addEventListener('click', prev);
 const openPlayer = () => { $('#player').classList.remove('hidden'); setTimeout(() => { drawWave(); kickWave(); }, 40); };
 $('#mini-meta').addEventListener('click', openPlayer);
 $('#mini-art').addEventListener('click', openPlayer);
@@ -1154,11 +1152,15 @@ $('#p-repeat').addEventListener('click', () => {
   state.repeat = state.repeat === 'off' ? 'all' : state.repeat === 'all' ? 'one' : 'off';
   saveMeta(); updatePlayerUI(); toast('Repeat: ' + state.repeat);
 });
-$('#eq-chips').addEventListener('click', (e) => {
-  const b = e.target.closest('[data-eq]'); if (!b) return;
-  ensureAudioGraph();
-  state.eq = b.dataset.eq; applyEq(state.eq); saveMeta();
-  toast('EQ: ' + b.textContent);
+$('#theme-chips').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-theme-name]'); if (!b) return;
+  applyTheme(b.dataset.themeName);
+  toast(b.dataset.themeName === 'miku' ? 'Theme: Hatsune Miku' : 'Theme: Localify');
+});
+$('#btn-theme').addEventListener('click', () => {
+  const nextTheme = state.theme === 'miku' ? 'green' : 'miku';
+  applyTheme(nextTheme);
+  toast(nextTheme === 'miku' ? 'Theme: Hatsune Miku' : 'Theme: Localify');
 });
 
 /* Sleep timer: cycles Off -> 15 -> 30 -> 45 -> 60 minutes. */
@@ -1228,7 +1230,7 @@ window.addEventListener('drop', (e) => { e.preventDefault(); importFiles(e.dataT
 (async function boot() {
   await loadMeta();
   $('#sort').value = state.sort;
-  applyEq(state.eq);
+  applyTheme(state.theme, false);
   try {
     const tracks = await DB.getAll('tracks');
     const fileKeys = new Set(await DB.keys('files').catch(() => []));
