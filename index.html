@@ -599,7 +599,7 @@ async function computeWavPeaks(r, info, buckets) {
   return peaks;
 }
 
-/* Fine-grained peaks for a short window (the scrolling strip): reads the
+/* Fine-grained peaks + 3-band levels for a short window (the scrolling strip): reads the
    actual PCM between t0 and t1 in chunks and returns `buckets` peak
    values. Chunked reads only — memory stays flat inside a 1.5 GB file. */
 async function computeFinePeaks(r, info, t0, t1, buckets) {
@@ -614,7 +614,14 @@ async function computeFinePeaks(r, info, t0, t1, buckets) {
   const startFrame = Math.max(0, Math.floor(t0 * sr));
   const endFrame = Math.min(totalFrames, Math.ceil(t1 * sr));
   const out = new Float32Array(buckets);
-  if (endFrame <= startFrame) return out;
+  const bLow = new Float32Array(buckets), bMid = new Float32Array(buckets), bHigh = new Float32Array(buckets);
+  if (endFrame <= startFrame) return { peaks: out, low: bLow, mid: bMid, high: bHigh };
+  /* Cheap 3-band split riding the same decode pass: two one-pole
+     low-passes (250 Hz / 4 kHz). low = lp250, mid = lp4k - lp250,
+     high = signal - lp4k. No FFT, no extra reads. */
+  const a1 = 1 - Math.exp((-2 * Math.PI * 250) / sr);
+  const a2 = 1 - Math.exp((-2 * Math.PI * 4000) / sr);
+  let lp1 = 0, lp2 = 0;
   const perBucket = (endFrame - startFrame) / buckets;
   const dv = (buf) => new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
   const sampleAt = (view, buf, o) => {
@@ -636,14 +643,21 @@ async function computeFinePeaks(r, info, t0, t1, buckets) {
       let acc = 0;
       const base = fr * info.blockAlign;
       for (let c = 0; c < ch; c++) acc += sampleAt(view, buf, base + c * bps);
-      const v = Math.abs(acc / ch);
+      const mono = acc / ch;
+      const v = Math.abs(mono);
       const b = Math.min(buckets - 1, Math.floor((framePos + fr - startFrame) / perBucket));
       if (v > out[b]) out[b] = v;
+      lp1 += a1 * (mono - lp1);
+      lp2 += a2 * (mono - lp2);
+      const lv = Math.abs(lp1), mv = Math.abs(lp2 - lp1), hv = Math.abs(mono - lp2);
+      if (lv > bLow[b]) bLow[b] = lv;
+      if (mv > bMid[b]) bMid[b] = mv;
+      if (hv > bHigh[b]) bHigh[b] = hv;
     }
     framePos += got;
     await tick();
   }
-  return out;
+  return { peaks: out, low: bLow, mid: bMid, high: bHigh };
 }
 
 async function peaksForFile(file) {
@@ -899,7 +913,7 @@ function render() {
  * variables and the waveform via peakColor(). Saved between launches. */
 const THEMES = ['green', 'miku', 'sonic', 'shadow', 'space'];
 const THEME_NAMES = { green: 'Localify', miku: 'Hatsune Miku', sonic: 'Sonic', shadow: 'Shadow', space: 'Space' };
-const BUILD = '4.8.1';
+const BUILD = '4.9';
 let peakColorCache = {};
 function applyTheme(name, save = true) {
   state.theme = THEMES.includes(name) ? name : 'green';
@@ -1045,6 +1059,15 @@ const scrollCv = $('#p-scroll');
    audio routing, so lock-screen playback stays untouched. Other
    formats fall back to the overview peaks. */
 const THEME_ACCENT = { green: '#1ed760', miku: '#39c5bb', sonic: '#2f7bff', shadow: '#e10600', space: '#8b7cff' };
+/* 3-band palettes for the scrolling strip, one per theme — the same
+   3-step colour language as each theme's overview waveform stops. */
+const THEME_BANDS = {
+  green: { low: '#0e9e4a', mid: '#1ed760', high: '#ffb020' },
+  miku: { low: '#1f8a80', mid: '#39c5bb', high: '#ff4d9d' },
+  sonic: { low: '#0057d9', mid: '#7dd3fc', high: '#ffd23e' },
+  shadow: { low: '#5a0d08', mid: '#e10600', high: '#f5c518' },
+  space: { low: '#5b4bc4', mid: '#8b7cff', high: '#7dd3fc' }
+};
 const SCROLL_SECONDS = 12;
 let scrollCache = { id: null, start: 0, dur: 40, fine: null, busy: false, gen: 0 };
 function interpArr(a, pos) {
@@ -1095,41 +1118,61 @@ function drawScroll(s, f, disp) {
   const dur = audio.duration || s.duration || 0;
   ensureScrollData(s, ct);
   const c = scrollCache;
-  const useFine = c.id === s.id && !!c.fine && ct >= c.start && ct <= c.start + c.dur;
-  const acc = THEME_ACCENT[state.theme] || '#1ed760';
+  const fine = (c.id === s.id && c.fine && c.fine.peaks && ct >= c.start && ct <= c.start + c.dur) ? c.fine : null;
   const mid = H / 2, halfH = mid - 3 * dpr;
   ctx.clearRect(0, 0, W, H);
   ctx.fillStyle = 'rgba(255,255,255,.12)';
   ctx.fillRect(0, mid - 0.5 * dpr, W, Math.max(1, dpr));
-  /* Column bars, NOT a connected line: a line strung through per-bucket
-     peaks zigzags and shimmers — the glitching Gabriel reported, worst
-     at the peaks. Bars are how real waveform displays render. The view
-     is snapped to the analysis grid so a column's content holds still
-     between steps instead of re-mapping every frame, and the sampled
-     peaks get a light 3-tap smoothing to tame single-bucket spikes. */
-  let viewStart = ct - SCROLL_SECONDS;
-  let bucketDur = 0;
-  if (useFine) {
-    bucketDur = c.dur / c.fine.length;
-    viewStart = c.start + Math.floor((viewStart - c.start) / bucketDur) * bucketDur;
-  }
-  const ampAt = (t) => {
-    if (t < 0 || !dur) return 0;
-    if (useFine) {
-      const pos = (t - c.start) / bucketDur;
-      return (interpArr(c.fine, pos - 1) + 2 * interpArr(c.fine, pos) + interpArr(c.fine, pos + 1)) / 4;
-    }
-    return interpArr(disp, (t / dur) * (disp ? disp.length : 0));
-  };
+  /* Column bars snapped to the analysis grid (a connected line through
+     per-bucket peaks zigzags — fixed in 4.8.1). With real sample data
+     each bar is STACKED in 3 bands: low at the centre, mid around it,
+     high at the tips, coloured from the SELECTED THEME's band palette.
+     Band shares set the segment heights; the overall peak sets the bar
+     height. Files without sample data keep the single-accent bars. */
   const step = Math.max(1, Math.round(dpr));
-  ctx.fillStyle = acc;
-  ctx.globalAlpha = 0.9;
-  for (let x = 0; x < W; x += step) {
-    const t = viewStart + ((x + step / 2) / W) * SCROLL_SECONDS;
-    const bh = Math.max(0.02, ampAt(t)) * halfH;
-    ctx.fillRect(x, mid - bh, Math.max(1, step * 0.82), bh * 2);
+  const bw = Math.max(1, step * 0.82);
+  if (fine) {
+    const bands = THEME_BANDS[state.theme] || THEME_BANDS.green;
+    const bucketDur = c.dur / fine.peaks.length;
+    const viewStart = c.start + Math.floor((ct - SCROLL_SECONDS - c.start) / bucketDur) * bucketDur;
+    const sm = (a, pos) => (interpArr(a, pos - 1) + 2 * interpArr(a, pos) + interpArr(a, pos + 1)) / 4;
+    const cols = Math.ceil(W / step);
+    const lH = new Float32Array(cols), mH = new Float32Array(cols), hH = new Float32Array(cols);
+    for (let i = 0; i < cols; i++) {
+      const t = viewStart + ((i * step + step / 2) / W) * SCROLL_SECONDS;
+      const pos = (t - c.start) / bucketDur;
+      const bh = Math.max(0.02, sm(fine.peaks, pos)) * halfH;
+      let l = sm(fine.low, pos), m = sm(fine.mid, pos) * 1.1, h = sm(fine.high, pos) * 1.3;
+      const tot = l + m + h;
+      if (tot < 0.001) { l = 1; m = 0; h = 0; } else { l /= tot; m /= tot; h /= tot; }
+      lH[i] = bh * l; mH[i] = bh * m; hH[i] = Math.max(0, bh - lH[i] - mH[i]);
+    }
+    ctx.globalAlpha = 0.92;
+    ctx.fillStyle = bands.low;
+    for (let i = 0; i < cols; i++) ctx.fillRect(i * step, mid - lH[i], bw, lH[i] * 2);
+    ctx.fillStyle = bands.mid;
+    for (let i = 0; i < cols; i++) {
+      ctx.fillRect(i * step, mid - lH[i] - mH[i], bw, mH[i]);
+      ctx.fillRect(i * step, mid + lH[i], bw, mH[i]);
+    }
+    ctx.fillStyle = bands.high;
+    for (let i = 0; i < cols; i++) {
+      ctx.fillRect(i * step, mid - lH[i] - mH[i] - hH[i], bw, hH[i]);
+      ctx.fillRect(i * step, mid + lH[i] + mH[i], bw, hH[i]);
+    }
+    ctx.globalAlpha = 1;
+  } else {
+    const acc = THEME_ACCENT[state.theme] || '#1ed760';
+    ctx.fillStyle = acc;
+    ctx.globalAlpha = 0.9;
+    for (let x = 0; x < W; x += step) {
+      const t = ct - SCROLL_SECONDS + ((x + step / 2) / W) * SCROLL_SECONDS;
+      const amp = (t < 0 || !dur) ? 0 : interpArr(disp, (t / dur) * (disp ? disp.length : 0));
+      const bh = Math.max(0.02, amp) * halfH;
+      ctx.fillRect(x, mid - bh, bw, bh * 2);
+    }
+    ctx.globalAlpha = 1;
   }
-  ctx.globalAlpha = 1;
   ctx.fillStyle = 'rgba(255,255,255,.9)';
   ctx.fillRect(W - 2 * dpr, 2 * dpr, 2 * dpr, H - 4 * dpr);
 }
