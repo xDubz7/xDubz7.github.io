@@ -899,7 +899,7 @@ function render() {
  * variables and the waveform via peakColor(). Saved between launches. */
 const THEMES = ['green', 'miku', 'sonic', 'shadow', 'space'];
 const THEME_NAMES = { green: 'Localify', miku: 'Hatsune Miku', sonic: 'Sonic', shadow: 'Shadow', space: 'Space' };
-const BUILD = '4.8';
+const BUILD = '4.8.1';
 let peakColorCache = {};
 function applyTheme(name, save = true) {
   state.theme = THEMES.includes(name) ? name : 'green';
@@ -1059,7 +1059,7 @@ function ensureScrollData(s, ct) {
   if (scrollCache.id !== s.id) scrollCache = { id: s.id, start: 0, dur: 40, fine: null, busy: false, gen: scrollCache.gen + 1 };
   const c = scrollCache;
   if (c.busy) return;
-  if (c.fine && ct >= c.start + 4 && ct <= c.start + c.dur - 12) return;
+  if (c.fine && c.start <= ct - 13 && ct <= c.start + c.dur - 4) return;
   c.busy = true;
   const gen = c.gen;
   (async () => {
@@ -1069,7 +1069,12 @@ function ensureScrollData(s, ct) {
       const r = new SliceReader(file);
       const info = await parseWav(r);
       if (!info || !info.dataStart) return;
-      const t0 = Math.max(0, ct - 10);
+      /* Start on a fixed 4 s grid so consecutive windows share the same
+         bucket phase — the picture doesn't jump when a window refreshes.
+         The window reaches 16+ s behind the playhead so the whole 12 s
+         view always has data (it previously started at -10 s and smeared
+         the left edge flat). */
+      const t0 = Math.max(0, Math.floor((ct - 16) / 4) * 4);
       const fine = await computeFinePeaks(r, info, t0, t0 + 40, 1600);
       if (gen !== scrollCache.gen || !fine) return;
       c.start = t0; c.dur = 40; c.fine = fine;
@@ -1089,38 +1094,42 @@ function drawScroll(s, f, disp) {
   const ct = audio.currentTime || 0;
   const dur = audio.duration || s.duration || 0;
   ensureScrollData(s, ct);
-  const useFine = scrollCache.id === s.id && !!scrollCache.fine && ct >= scrollCache.start && ct <= scrollCache.start + scrollCache.dur;
+  const c = scrollCache;
+  const useFine = c.id === s.id && !!c.fine && ct >= c.start && ct <= c.start + c.dur;
   const acc = THEME_ACCENT[state.theme] || '#1ed760';
-  const mid = H / 2;
+  const mid = H / 2, halfH = mid - 3 * dpr;
   ctx.clearRect(0, 0, W, H);
   ctx.fillStyle = 'rgba(255,255,255,.12)';
   ctx.fillRect(0, mid - 0.5 * dpr, W, Math.max(1, dpr));
+  /* Column bars, NOT a connected line: a line strung through per-bucket
+     peaks zigzags and shimmers — the glitching Gabriel reported, worst
+     at the peaks. Bars are how real waveform displays render. The view
+     is snapped to the analysis grid so a column's content holds still
+     between steps instead of re-mapping every frame, and the sampled
+     peaks get a light 3-tap smoothing to tame single-bucket spikes. */
+  let viewStart = ct - SCROLL_SECONDS;
+  let bucketDur = 0;
+  if (useFine) {
+    bucketDur = c.dur / c.fine.length;
+    viewStart = c.start + Math.floor((viewStart - c.start) / bucketDur) * bucketDur;
+  }
   const ampAt = (t) => {
     if (t < 0 || !dur) return 0;
-    if (useFine) return interpArr(scrollCache.fine, ((t - scrollCache.start) / scrollCache.dur) * scrollCache.fine.length);
+    if (useFine) {
+      const pos = (t - c.start) / bucketDur;
+      return (interpArr(c.fine, pos - 1) + 2 * interpArr(c.fine, pos) + interpArr(c.fine, pos + 1)) / 4;
+    }
     return interpArr(disp, (t / dur) * (disp ? disp.length : 0));
   };
-  const step = 2 * dpr;
-  ctx.beginPath();
-  for (let x = 0; x <= W; x += step) {
-    const t = ct - SCROLL_SECONDS + (x / W) * SCROLL_SECONDS;
-    const y = mid - Math.max(0.02, ampAt(t)) * (mid - 3 * dpr);
-    if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  const step = Math.max(1, Math.round(dpr));
+  ctx.fillStyle = acc;
+  ctx.globalAlpha = 0.9;
+  for (let x = 0; x < W; x += step) {
+    const t = viewStart + ((x + step / 2) / W) * SCROLL_SECONDS;
+    const bh = Math.max(0.02, ampAt(t)) * halfH;
+    ctx.fillRect(x, mid - bh, Math.max(1, step * 0.82), bh * 2);
   }
-  for (let x = W; x >= 0; x -= step) {
-    const t = ct - SCROLL_SECONDS + (x / W) * SCROLL_SECONDS;
-    ctx.lineTo(x, mid + Math.max(0.02, ampAt(t)) * (mid - 3 * dpr));
-  }
-  ctx.closePath();
-  ctx.globalAlpha = 0.30; ctx.fillStyle = acc; ctx.fill();
   ctx.globalAlpha = 1;
-  ctx.beginPath();
-  for (let x = 0; x <= W; x += step) {
-    const t = ct - SCROLL_SECONDS + (x / W) * SCROLL_SECONDS;
-    const y = mid - Math.max(0.02, ampAt(t)) * (mid - 3 * dpr);
-    if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-  }
-  ctx.strokeStyle = acc; ctx.lineWidth = 1.4 * dpr; ctx.stroke();
   ctx.fillStyle = 'rgba(255,255,255,.9)';
   ctx.fillRect(W - 2 * dpr, 2 * dpr, 2 * dpr, H - 4 * dpr);
 }
