@@ -925,7 +925,7 @@ function render() {
  * variables and the waveform via peakColor(). Saved between launches. */
 const THEMES = ['green', 'miku', 'sonic', 'shadow', 'space'];
 const THEME_NAMES = { green: 'Localify', miku: 'Hatsune Miku', sonic: 'Sonic', shadow: 'Shadow', space: 'Space' };
-const BUILD = '4.7.1';
+const BUILD = '4.7.2';
 let peakColorCache = {};
 function applyTheme(name, save = true) {
   state.theme = THEMES.includes(name) ? name : 'green';
@@ -1121,16 +1121,16 @@ function drawWave() {
   }
   const n = disp.length, bw = W / n;
   const REST = WAVE_REST[state.theme] || '#3d4a63';
-  /* Animation while playing (rests when paused), modelled on the movement
-     in Gabriel's reference video: a ripple keeps travelling through the
-     played bars, and the bars around the playhead bounce hard with the
-     music. The drive signal is the song's OWN loudness at the playhead
-     (fast attack, slow release, like a real level meter) — no audio
-     routing needed, so lock-screen playback stays untouched. */
+  /* Animation while playing (rests when paused), the v4.3 behaviour
+     Gabriel asked back for: ONLY the bars around the playhead bounce,
+     driven by the song's OWN loudness at the playhead — no audio routing
+     needed, so lock-screen playback stays untouched. (The v4.5–4.7
+     travelling ripple across the played region is gone; the spectrum
+     strip below now carries the wider motion.) */
   const playingNow = !audio.paused && !audio.ended;
   const playBucket = f * n;
   const targetLevel = playingNow ? Math.max(0.12, disp[Math.min(n - 1, Math.floor(playBucket))] || 0) : 0;
-  waveLevel += (targetLevel - waveLevel) * (targetLevel > waveLevel ? 0.5 : 0.12);
+  waveLevel += (targetLevel - waveLevel) * (playingNow ? 0.4 : 0.15);
   const nowMs = performance.now();
   ctx.fillStyle = 'rgba(255,255,255,.14)';
   ctx.fillRect(0, mid - 0.5 * dpr, W, Math.max(1, dpr));
@@ -1138,11 +1138,11 @@ function drawWave() {
     const p = Math.max(0.04, disp[i]);
     let bh = p * (H - 6 * dpr);
     if (waveLevel > 0.02) {
-      let amp = 0;
-      if (i / n <= f) amp += waveLevel * 0.16 * (0.5 + 0.5 * Math.sin(nowMs / 130 + i * 0.55));
       const dist = Math.abs(i - playBucket);
-      if (dist < 30) amp += waveLevel * (1 - dist / 30) * (0.65 + 0.35 * Math.sin(nowMs / 110 + i * 1.35)) * 0.8;
-      if (amp) bh = Math.min(H - 2 * dpr, bh * (1 + amp));
+      if (dist < 26) {
+        const boost = waveLevel * (1 - dist / 26) * (0.65 + 0.35 * Math.sin(nowMs / 110 + i * 1.35));
+        bh = Math.min(H - 2 * dpr, bh * (1 + boost * 0.9));
+      }
     }
     ctx.fillStyle = (i / n <= f) ? peakColor(p) : REST;
     ctx.fillRect(i * bw + bw * 0.18, mid - bh / 2, Math.max(1, bw * 0.6), bh);
