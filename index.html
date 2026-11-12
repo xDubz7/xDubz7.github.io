@@ -65,6 +65,38 @@
 /* Every non-default theme uses its secondary accent (--pink) for
    favorite hearts and active transport toggles. */
 [data-theme="miku"] .song .fav.on, [data-theme="sonic"] .song .fav.on,
+/* SoundCloud: burnt orange on near-black (Gabriel's DJ platform). */
+[data-theme="soundcloud"]{
+  --bg:#0a0a0a; --panel:#131313; --panel2:#1c1c1c; --line:#2b2b2b;
+  --dim:#a6a6a6;
+  --green:#ff5500; --green-d:#d14400; --amber:#ffb38a;
+  --pink:#ff8a50;
+}
+/* CDJ: deck grey/black with Pioneer blue. */
+[data-theme="cdj"]{
+  --bg:#0a0c0f; --panel:#11151b; --panel2:#1a2029; --line:#28303d;
+  --dim:#93a5bd;
+  --green:#0096ff; --green-d:#0076cc; --amber:#7dd3fc;
+  --pink:#e8f4ff;
+}
+/* Vaporwave: deep purple, pink lead, cyan secondary, pale-yellow amber. */
+[data-theme="vapor"]{
+  --bg:#150826; --panel:#1f0b38; --panel2:#2a1150; --line:#3d2070;
+  --text:#ffe9fb; --dim:#c9a6e8;
+  --green:#ff71ce; --green-d:#d14ba8; --amber:#fffb96;
+  --pink:#01cdfe;
+}
+/* Vinyl: warm amber/sepia on dark brown-black. */
+[data-theme="vinyl"]{
+  --bg:#16100a; --panel:#20180d; --panel2:#2b2011; --line:#3d2c15;
+  --text:#f5e9cd; --dim:#bfa77e;
+  --green:#e8a33d; --green-d:#bc7f24; --amber:#ffd98a;
+  --pink:#d97b3f;
+}
+[data-theme="soundcloud"] .song .fav.on, [data-theme="cdj"] .song .fav.on,
+[data-theme="vapor"] .song .fav.on, [data-theme="vinyl"] .song .fav.on{color:var(--pink)}
+[data-theme="soundcloud"] .controls .pbtn.toggled, [data-theme="cdj"] .controls .pbtn.toggled,
+[data-theme="vapor"] .controls .pbtn.toggled, [data-theme="vinyl"] .controls .pbtn.toggled{color:var(--pink)}
 [data-theme="shadow"] .song .fav.on, [data-theme="space"] .song .fav.on{color:var(--pink)}
 [data-theme="miku"] .controls .pbtn.toggled, [data-theme="sonic"] .controls .pbtn.toggled,
 [data-theme="shadow"] .controls .pbtn.toggled, [data-theme="space"] .controls .pbtn.toggled{color:var(--pink)}
@@ -144,7 +176,7 @@ main{padding:12px 12px calc(120px + var(--sab))}
 .pbtn.main{background:var(--green);color:#04140a;font-size:19px}
 
 /* ---------- full player ---------- */
-#player{position:fixed;inset:0;z-index:40;background:var(--bg);
+#player{position:fixed;inset:0;z-index:40;background:var(--bg);overflow-y:auto;
   padding:calc(14px + var(--sat)) 22px calc(18px + var(--sab));display:flex;flex-direction:column}
 #player .close{align-self:flex-start;font-size:26px;color:var(--dim);padding:4px 8px}
 #player .part{width:min(72vw,320px);height:min(72vw,320px);margin:18px auto;border-radius:18px;
@@ -155,7 +187,13 @@ main{padding:12px 12px calc(120px + var(--sab))}
 #player .src{text-align:center;color:var(--dim);font-size:12px;margin-bottom:14px}
 .seekrow{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--dim);font-variant-numeric:tabular-nums}
 .seekrow input{flex:1;accent-color:var(--green);height:28px}
-.controls{display:flex;align-items:center;justify-content:center;gap:14px;margin-top:10px}
+.controls{display:flex;align-items:center;justify-content:center;gap:10px;margin-top:10px}
+.controls .pbtn.skip{width:44px;height:44px;font-size:12.5px;font-weight:700;color:var(--dim)}
+#update-pill{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(158px + var(--sab));z-index:61;
+  background:var(--green);color:#04140a;font-weight:700;font-size:14px;padding:10px 18px;border-radius:999px;
+  box-shadow:0 8px 24px rgba(0,0,0,.5);cursor:pointer;white-space:nowrap}
+#update-pill .x{margin-left:10px;opacity:.65;font-weight:400}
+.cuex{margin-left:7px;opacity:.6;font-weight:700}
 .controls .pbtn{width:52px;height:52px;font-size:22px}
 .controls .pbtn.main{width:66px;height:66px;font-size:27px}
 .controls .pbtn.toggled{color:var(--green)}
@@ -283,14 +321,20 @@ main{padding:12px 12px calc(120px + var(--sab))}
   <canvas id="p-scroll"></canvas>
   <div class="controls">
     <button class="pbtn" id="p-shuffle" aria-label="Shuffle"></button>
+    <button class="pbtn skip" id="p-back30" aria-label="Back 30 seconds">−30</button>
     <button class="pbtn" id="p-prev" aria-label="Previous"></button>
     <button class="pbtn main" id="p-play" aria-label="Play or pause"></button>
     <button class="pbtn" id="p-next" aria-label="Next"></button>
+    <button class="pbtn skip" id="p-fwd30" aria-label="Forward 30 seconds">+30</button>
     <button class="pbtn" id="p-repeat" aria-label="Repeat"></button>
   </div>
   <div class="eqrow"><span class="eqlab">THEME</span><div class="eqchips" id="theme-chips">
-    <button data-theme-name="green" class="eqchip on"><span class="tdot" style="background:#1ed760"></span>Localify</button><button data-theme-name="miku" class="eqchip"><span class="tdot" style="background:linear-gradient(90deg,#39c5bb 50%,#ff2e88 50%)"></span>Miku</button><button data-theme-name="sonic" class="eqchip"><span class="tdot" style="background:#2f7bff"></span>Sonic</button><button data-theme-name="shadow" class="eqchip"><span class="tdot" style="background:linear-gradient(90deg,#e10600 50%,#f5c518 50%)"></span>Shadow</button><button data-theme-name="space" class="eqchip"><span class="tdot" style="background:#8b7cff"></span>Space</button>
+    <button data-theme-name="green" class="eqchip on"><span class="tdot" style="background:#1ed760"></span>Localify</button><button data-theme-name="miku" class="eqchip"><span class="tdot" style="background:linear-gradient(90deg,#39c5bb 50%,#ff2e88 50%)"></span>Miku</button><button data-theme-name="sonic" class="eqchip"><span class="tdot" style="background:#2f7bff"></span>Sonic</button><button data-theme-name="shadow" class="eqchip"><span class="tdot" style="background:linear-gradient(90deg,#e10600 50%,#f5c518 50%)"></span>Shadow</button><button data-theme-name="space" class="eqchip"><span class="tdot" style="background:#8b7cff"></span>Space</button><button data-theme-name="soundcloud" class="eqchip"><span class="tdot" style="background:#ff5500"></span>SoundCloud</button><button data-theme-name="cdj" class="eqchip"><span class="tdot" style="background:#0096ff"></span>CDJ</button><button data-theme-name="vapor" class="eqchip"><span class="tdot" style="background:linear-gradient(90deg,#ff71ce 50%,#01cdfe 50%)"></span>Vaporwave</button><button data-theme-name="vinyl" class="eqchip"><span class="tdot" style="background:#e8a33d"></span>Vinyl</button>
   </div></div>
+  <div class="eqrow"><span class="eqlab">SPEED</span><div class="eqchips" id="speed-chips">
+    <button data-rate="0.8" class="eqchip">0.8×</button><button data-rate="1" class="eqchip on">1×</button><button data-rate="1.1" class="eqchip">1.1×</button><button data-rate="1.25" class="eqchip">1.25×</button><button data-rate="lock" class="eqchip on">Pitch lock</button>
+  </div></div>
+  <div class="eqrow"><span class="eqlab">CUES</span><div class="eqchips" id="cue-chips"></div><button class="eqchip" id="cue-add">+ Cue</button></div>
 </div>
 
 <div id="plWrap" class="hidden"><div id="plsheet">
@@ -299,8 +343,10 @@ main{padding:12px 12px calc(120px + var(--sab))}
   <div class="plrow"><button id="pl-cancel">Cancel</button><button id="pl-create" class="primary">Create</button></div>
 </div></div>
 <div id="sheetWrap" class="hidden"><div id="sheet"></div></div>
+<div id="update-pill" class="hidden"></div>
 <div id="toast" class="hidden"></div>
 
+<input type="file" id="backup-input" class="hidden" accept=".json,application/json">
 <input type="file" id="file-input" class="hidden" multiple
   accept="audio/*,.mp3,.flac,.wav,.ogg,.oga,.m4a,.aac,.opus,.wma,.webm,.aif,.aiff">
 <audio id="audio" preload="metadata" playsinline></audio>
@@ -409,6 +455,7 @@ const state = {
   queue: [], qIndex: -1,
   shuffle: false, repeat: 'off', // off | all | one
   theme: 'green',
+  rate: 1, pitchLock: true,
   importing: null,
   currentId: null,
 };
@@ -422,7 +469,7 @@ function saveMeta() {
     favorites: [...state.favorites],
     playlists: state.playlists,
     sort: state.sort, shuffle: state.shuffle, repeat: state.repeat,
-    theme: state.theme, currentId: state.currentId,
+    theme: state.theme, currentId: state.currentId, rate: state.rate, pitchLock: state.pitchLock,
   }}).catch(() => {});
 }
 async function loadMeta() {
@@ -434,6 +481,8 @@ async function loadMeta() {
     state.sort = v.sort || 'title';
     state.shuffle = !!v.shuffle; state.repeat = v.repeat || 'off';
     state.theme = v.theme || 'green';
+    state.rate = Number(v.rate) || 1;
+    state.pitchLock = v.pitchLock !== false;
     state.currentId = v.currentId || null;
   } catch (e) { /* first run */ }
 }
@@ -461,6 +510,58 @@ function toast(msg) {
   clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.add('hidden'), 3200);
 }
 const tick = () => new Promise((r) => setTimeout(r, 0));
+
+/* ================= library backup =================
+ * Playlists, favorites, cues and resume positions live in this browser's
+ * storage — clearing website data would wipe them. Export downloads one
+ * JSON file keyed by file name + size (the same identity used to
+ * re-attach session files); Import merges it back onto matching songs. */
+function songKey(s) { return (s.fileName || '') + '|' + (s.size || 0); }
+function exportBackup() {
+  const data = { app: 'localify', kind: 'library-backup', version: 1, build: BUILD, exportedAt: new Date().toISOString(), playlists: [], songs: [] };
+  for (const s of state.songs) {
+    data.songs.push({ key: songKey(s), fileName: s.fileName, size: s.size, title: s.title,
+      favorite: state.favorites.has(s.id), cues: Array.isArray(s.cues) ? s.cues : [], pos: s.pos || 0 });
+  }
+  data.playlists = state.playlists.map((pl) => ({ name: pl.name,
+    keys: pl.ids.map((id) => { const s = state.byId.get(id); return s ? songKey(s) : null; }).filter(Boolean) }));
+  const blob = new Blob([JSON.stringify(data, null, 1)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'localify-backup.json';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  toast('Backup downloaded — keep the file somewhere safe');
+}
+async function importBackup(file) {
+  try {
+    const data = JSON.parse(await file.text());
+    if (!data || data.app !== 'localify' || !Array.isArray(data.songs)) { toast('That file is not a Localify backup'); return; }
+    const byKey = new Map(state.songs.map((s) => [songKey(s), s]));
+    let matched = 0;
+    for (const entry of data.songs) {
+      const s = byKey.get(entry.key); if (!s) continue;
+      matched++;
+      if (entry.favorite) state.favorites.add(s.id);
+      if (Array.isArray(entry.cues) && entry.cues.length) {
+        const merged = Array.isArray(s.cues) ? [...s.cues] : [];
+        for (const cu of entry.cues) if (!merged.some((x) => Math.abs(x.t - cu.t) < 2)) merged.push({ t: cu.t, label: cu.label || '' });
+        s.cues = merged.sort((a, b) => a.t - b.t);
+      }
+      if (entry.pos > 5 && !(s.pos > 5)) s.pos = entry.pos;
+      DB.put('tracks', s).catch(() => {});
+    }
+    for (const pl of data.playlists || []) {
+      const ids = (pl.keys || []).map((k) => byKey.get(k)).filter(Boolean).map((s) => s.id);
+      if (!ids.length) continue;
+      const existing = state.playlists.find((x) => x.name === pl.name);
+      if (existing) { for (const id of ids) if (!existing.ids.includes(id)) existing.ids.push(id); }
+      else state.playlists.push({ name: pl.name, ids });
+    }
+    saveMeta(); render(); renderCues();
+    toast('Backup restored — matched ' + matched + ' of ' + data.songs.length + ' songs');
+  } catch (e) { toast('Could not read that backup file'); }
+}
 
 function fileId(file) {
   const key = `${file.name}|${file.size}|${file.lastModified || 0}`;
@@ -858,6 +959,8 @@ function renderChips() {
   const chips = [{ k: 'all', label: 'All songs' }, { k: 'fav', label: 'Favorites', ic: 'heartFill' }];
   state.playlists.forEach((pl, i) => chips.push({ k: 'pl:' + i, label: pl.name }));
   chips.push({ k: '__newpl', label: '+ Playlist' });
+  chips.push({ k: '__backup', label: 'Export backup' });
+  chips.push({ k: '__restore', label: 'Import backup' });
   $('#chips').innerHTML = chips.map((c) =>
     `<button class="chip ${state.filter === c.k ? 'on' : ''}" data-chip="${esc(c.k)}">${c.ic ? icon(c.ic) : ''}${esc(c.label)}</button>`).join('');
 }
@@ -890,7 +993,7 @@ function render() {
       <div class="art">${art}</div>
       <div class="meta">
         <div class="title">${esc(s.title)}${badge}</div>
-        <div class="sub">${esc(s.artist)}${s.album ? ' · ' + esc(s.album) : ''} · ${fmtTime(s.duration)} · ${fmtSize(s.size)}</div>
+        <div class="sub">${esc(s.artist)}${s.album ? ' · ' + esc(s.album) : ''} · ${fmtTime(s.duration)} · ${fmtSize(s.size)}${s.pos > 5 ? ' · resume at ' + fmtTime(s.pos) : ''}</div>
       </div>
       <button class="fav ${state.favorites.has(s.id) ? 'on' : ''}" data-fav="${esc(s.id)}" aria-label="Favorite">${icon(state.favorites.has(s.id) ? 'heartFill' : 'heart')}</button>
       <button class="dots" data-menu="${esc(s.id)}" aria-label="More">${icon('dots')}</button>
@@ -911,9 +1014,9 @@ function render() {
  * 'green' = the Localify green. 'miku' = Hatsune Miku teal (#39c5bb) with
  * pink kept for hearts. The choice recolours the whole UI via the CSS
  * variables and the waveform via peakColor(). Saved between launches. */
-const THEMES = ['green', 'miku', 'sonic', 'shadow', 'space'];
-const THEME_NAMES = { green: 'Localify', miku: 'Hatsune Miku', sonic: 'Sonic', shadow: 'Shadow', space: 'Space' };
-const BUILD = '4.9';
+const THEMES = ['green', 'miku', 'sonic', 'shadow', 'space', 'soundcloud', 'cdj', 'vapor', 'vinyl'];
+const THEME_NAMES = { green: 'Localify', miku: 'Hatsune Miku', sonic: 'Sonic', shadow: 'Shadow', space: 'Space', soundcloud: 'SoundCloud', cdj: 'CDJ', vapor: 'Vaporwave', vinyl: 'Vinyl' };
+const BUILD = '5.0';
 let peakColorCache = {};
 function applyTheme(name, save = true) {
   state.theme = THEMES.includes(name) ? name : 'green';
@@ -934,8 +1037,12 @@ const WAVE_STOPS = {
   sonic:  [[47, 123, 255], [125, 211, 252], [255, 210, 63]],
   shadow: [[225, 6, 0], [255, 110, 64], [245, 197, 24]],
   space:  [[139, 124, 255], [125, 211, 252], [255, 183, 213]],
+  soundcloud: [[122, 40, 0], [255, 85, 0], [255, 205, 150]],
+  cdj:    [[6, 43, 77], [0, 150, 255], [207, 234, 255]],
+  vapor:  [[91, 42, 157], [255, 113, 206], [255, 251, 150]],
+  vinyl:  [[110, 68, 19], [232, 163, 61], [255, 237, 181]],
 };
-const WAVE_REST = { green: '#3d4a63', miku: '#46324a', sonic: '#26355c', shadow: '#3a2f28', space: '#262b52' };
+const WAVE_REST = { green: '#3d4a63', miku: '#46324a', sonic: '#26355c', shadow: '#3a2f28', space: '#262b52', soundcloud: '#2e2622', cdj: '#232a33', vapor: '#33204d', vinyl: '#33270f' };
 function peakColor(p) {
   const q = Math.round(Math.min(1, Math.max(0, p)) * 24);
   const key = state.theme + ':' + q;
@@ -999,6 +1106,19 @@ async function playSong(id, queue) {
   currentUrl = URL.createObjectURL(file);   /* native streaming playback; the file is never copied into JS memory */
   state.currentId = id;
   audio.src = currentUrl;
+  applyRate();
+  /* Resume where this song left off (long mixes!). One-shot listener,
+     token-guarded so a fast song switch can't seek the wrong track. */
+  const resumeAt = song.pos > 5 ? song.pos : 0;
+  if (resumeAt) {
+    const onMeta = () => {
+      audio.removeEventListener('loadedmetadata', onMeta);
+      if (token === playToken && isFinite(audio.duration) && resumeAt < audio.duration - 10) {
+        try { audio.currentTime = resumeAt; toast('Resumed at ' + fmtTime(resumeAt)); } catch (e) {}
+      }
+    };
+    audio.addEventListener('loadedmetadata', onMeta);
+  }
   audio.play().catch(() => {});
   ensurePeaks(song, file);
   saveMeta(); render(); updatePlayerUI();
@@ -1058,7 +1178,7 @@ const scrollCv = $('#p-scroll');
    playhead (40 s windows, refreshed as playback moves), never from live
    audio routing, so lock-screen playback stays untouched. Other
    formats fall back to the overview peaks. */
-const THEME_ACCENT = { green: '#1ed760', miku: '#39c5bb', sonic: '#2f7bff', shadow: '#e10600', space: '#8b7cff' };
+const THEME_ACCENT = { green: '#1ed760', miku: '#39c5bb', sonic: '#2f7bff', shadow: '#e10600', space: '#8b7cff', soundcloud: '#ff5500', cdj: '#0096ff', vapor: '#ff71ce', vinyl: '#e8a33d' };
 /* 3-band palettes for the scrolling strip, one per theme — the same
    3-step colour language as each theme's overview waveform stops. */
 const THEME_BANDS = {
@@ -1066,7 +1186,11 @@ const THEME_BANDS = {
   miku: { low: '#1f8a80', mid: '#39c5bb', high: '#ff4d9d' },
   sonic: { low: '#0057d9', mid: '#7dd3fc', high: '#ffd23e' },
   shadow: { low: '#5a0d08', mid: '#e10600', high: '#f5c518' },
-  space: { low: '#5b4bc4', mid: '#8b7cff', high: '#7dd3fc' }
+  space: { low: '#5b4bc4', mid: '#8b7cff', high: '#7dd3fc' },
+  soundcloud: { low: '#7a2800', mid: '#ff5500', high: '#ffc46b' },
+  cdj: { low: '#063a66', mid: '#0096ff', high: '#cfeaff' },
+  vapor: { low: '#5b2a9d', mid: '#ff71ce', high: '#01cdfe' },
+  vinyl: { low: '#6e4413', mid: '#e8a33d', high: '#ffedb5' }
 };
 const SCROLL_SECONDS = 12;
 let scrollCache = { id: null, start: 0, dur: 40, fine: null, busy: false, gen: 0 };
@@ -1224,6 +1348,17 @@ function drawWave() {
     ctx.fillStyle = (i / n <= f) ? peakColor(p) : REST;
     ctx.fillRect(i * bw + bw * 0.18, mid - bh / 2, Math.max(1, bw * 0.6), bh);
   }
+  if (s.cues && s.cues.length) {
+    const durT = audio.duration || s.duration || 0;
+    if (durT) {
+      ctx.fillStyle = peakColor(0.95);
+      for (const cu of s.cues) {
+        const x = Math.round((cu.t / durT) * W);
+        ctx.fillRect(x - dpr, 0, 2 * dpr, 6 * dpr);
+        ctx.fillRect(x - dpr, H - 6 * dpr, 2 * dpr, 6 * dpr);
+      }
+    }
+  }
   ctx.fillStyle = 'rgba(255,255,255,.9)';
   ctx.fillRect(Math.max(0, Math.round(f * W) - dpr), 2 * dpr, 2 * dpr, H - 4 * dpr);
   drawScroll(s, f, disp);
@@ -1271,6 +1406,7 @@ function updatePlayerUI() {
   $('#p-title').textContent = s.title;
   $('#p-artist').textContent = s.artist + (s.album ? ' — ' + s.album : '');
   $('#p-src').textContent = 'On this device · ' + fmtSize(s.size) + (s.sessionOnly ? ' · plays for this session (not stored)' : ' · stored on this device');
+  renderCues();
   $('#p-shuffle').classList.toggle('toggled', state.shuffle);
   $('#p-repeat').classList.toggle('toggled', state.repeat !== 'off');
   $('#p-repeat').innerHTML = icon(state.repeat === 'one' ? 'repeatOne' : 'repeat');
@@ -1351,6 +1487,8 @@ $('#chips').addEventListener('click', (e) => {
   const b = e.target.closest('[data-chip]'); if (!b) return;
   const k = b.dataset.chip;
   if (k === '__newpl') { showPlForm(); return; }
+  if (k === '__backup') { exportBackup(); return; }
+  if (k === '__restore') { $('#backup-input').click(); return; }
   state.filter = k; render();
 });
 
@@ -1367,6 +1505,7 @@ $('#main').addEventListener('click', (e) => {
   if (row) playSong(row.dataset.play, visibleSongs());
 });
 
+$('#backup-input').addEventListener('change', (e) => { if (e.target.files[0]) importBackup(e.target.files[0]); e.target.value = ''; });
 $('#pl-create').addEventListener('click', createPlFromForm);
 $('#pl-cancel').addEventListener('click', hidePlForm);
 $('#pl-name').addEventListener('keydown', (e) => { if (e.key === 'Enter') createPlFromForm(); });
@@ -1388,8 +1527,45 @@ $('#mini-play').addEventListener('click', (e) => { e.stopPropagation(); togglePl
 $('#p-play').addEventListener('click', togglePlay);
 $('#mini-next').addEventListener('click', (e) => { e.stopPropagation(); next(false); });
 $('#mini-prev').addEventListener('click', (e) => { e.stopPropagation(); prev(); });
+const skipBy = (sec) => {
+  if (isFinite(audio.duration) && audio.duration)
+    audio.currentTime = Math.min(Math.max(0, audio.currentTime + sec), audio.duration);
+};
+$('#p-back30').addEventListener('click', () => skipBy(-30));
+$('#p-fwd30').addEventListener('click', () => skipBy(30));
 $('#p-next').addEventListener('click', () => next(false));
 $('#p-prev').addEventListener('click', prev);
+function renderCues() {
+  const wrap = $('#cue-chips'); if (!wrap) return;
+  const s = currentSong();
+  const cues = (s && Array.isArray(s.cues)) ? s.cues : [];
+  wrap.innerHTML = cues.map((cu, i) =>
+    `<button class="eqchip" data-cue="${i}">${fmtTime(cu.t)}<span class="cuex" data-cuex="${i}">×</span></button>`).join('');
+}
+function addCue() {
+  const s = currentSong(); if (!s) return;
+  if (!isFinite(audio.duration) || !audio.duration) { toast('Play something first, then mark it'); return; }
+  const t = Math.round(audio.currentTime * 10) / 10;
+  if (!Array.isArray(s.cues)) s.cues = [];
+  if (s.cues.some((cu) => Math.abs(cu.t - t) < 2)) { toast('There is already a cue near ' + fmtTime(t)); return; }
+  s.cues.push({ t, label: '' });
+  s.cues.sort((a, b) => a.t - b.t);
+  DB.put('tracks', s).catch(() => {});
+  renderCues(); drawWave();
+  toast('Cue added at ' + fmtTime(t));
+}
+$('#cue-add').addEventListener('click', addCue);
+$('#cue-chips').addEventListener('click', (e) => {
+  const s = currentSong(); if (!s || !Array.isArray(s.cues)) return;
+  const x = e.target.closest('[data-cuex]');
+  if (x) {
+    s.cues.splice(Number(x.dataset.cuex), 1);
+    DB.put('tracks', s).catch(() => {});
+    renderCues(); drawWave(); toast('Cue removed'); return;
+  }
+  const b = e.target.closest('[data-cue]');
+  if (b) { const cu = s.cues[Number(b.dataset.cue)]; if (cu) { audio.currentTime = cu.t; audio.play().catch(() => {}); } }
+});
 const openPlayer = () => { $('#player').classList.remove('hidden'); setTimeout(() => { drawWave(); kickWave(); }, 40); };
 $('#mini-meta').addEventListener('click', openPlayer);
 $('#mini-art').addEventListener('click', openPlayer);
@@ -1398,6 +1574,27 @@ $('#p-shuffle').addEventListener('click', () => { state.shuffle = !state.shuffle
 $('#p-repeat').addEventListener('click', () => {
   state.repeat = state.repeat === 'off' ? 'all' : state.repeat === 'all' ? 'one' : 'off';
   saveMeta(); updatePlayerUI(); toast('Repeat: ' + state.repeat);
+});
+function applyRate() {
+  audio.playbackRate = state.rate || 1;
+  const lock = state.pitchLock !== false;
+  try { audio.preservesPitch = lock; } catch (e) {}
+  try { audio.webkitPreservesPitch = lock; } catch (e) {}
+  document.querySelectorAll('#speed-chips [data-rate]').forEach((ch) => {
+    const r = ch.dataset.rate;
+    ch.classList.toggle('on', r === 'lock' ? lock : Math.abs(Number(r) - (state.rate || 1)) < 0.001);
+  });
+}
+$('#speed-chips').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-rate]'); if (!b) return;
+  if (b.dataset.rate === 'lock') {
+    state.pitchLock = state.pitchLock === false;
+    toast('Pitch lock: ' + (state.pitchLock ? 'on — pitch stays natural' : 'off — pitch shifts like vinyl'));
+  } else {
+    state.rate = Number(b.dataset.rate);
+    toast('Speed: ' + state.rate + '×');
+  }
+  saveMeta(); applyRate();
 });
 $('#theme-chips').addEventListener('click', (e) => {
   const b = e.target.closest('[data-theme-name]'); if (!b) return;
@@ -1416,6 +1613,7 @@ audio.addEventListener('timeupdate', () => {
     $('#p-dur').textContent = fmtTime(audio.duration);
     const mf = $('#mini-prog-fill');
     if (mf) mf.style.width = (audio.currentTime / audio.duration * 100) + '%';
+    savePos(false);
     if (!$('#player').classList.contains('hidden') && !waveSeeking) drawWave();
     /* If the header duration was missing/wrong, learn the real one. */
     const s = currentSong();
@@ -1425,9 +1623,25 @@ audio.addEventListener('timeupdate', () => {
     }
   }
 });
+let lastPosSave = 0;
+function savePos(force) {
+  const s = currentSong();
+  if (!s || !isFinite(audio.duration) || !audio.duration) return;
+  if (!force && Date.now() - lastPosSave < 4000) return;
+  lastPosSave = Date.now();
+  const p = Math.floor(audio.currentTime);
+  s.pos = (p > 5 && p < audio.duration - 10) ? p : 0;
+  DB.put('tracks', s).catch(() => {});
+}
 audio.addEventListener('play', updatePlayerUI);
-audio.addEventListener('pause', updatePlayerUI);
-audio.addEventListener('ended', () => next(true));
+audio.addEventListener('pause', () => { savePos(true); updatePlayerUI(); });
+audio.addEventListener('ended', () => {
+  const s = currentSong();
+  if (s && s.pos) { s.pos = 0; DB.put('tracks', s).catch(() => {}); }
+  next(true);
+});
+document.addEventListener('visibilitychange', () => { if (document.hidden) savePos(true); });
+window.addEventListener('pagehide', () => savePos(true));
 audio.addEventListener('error', () => {
   if (state.currentId) toast('That file could not be played — it may have been moved or is in a format Safari can’t decode');
 });
@@ -1439,8 +1653,37 @@ if ('mediaSession' in navigator) {
     navigator.mediaSession.setActionHandler('previoustrack', prev);
     navigator.mediaSession.setActionHandler('nexttrack', () => next(false));
     navigator.mediaSession.setActionHandler('seekto', (d) => { if (typeof d.seekTime === 'number') audio.currentTime = d.seekTime; });
+    navigator.mediaSession.setActionHandler('seekbackward', () => skipBy(-30));
+    navigator.mediaSession.setActionHandler('seekforward', () => skipBy(30));
   } catch (e) { /* older Safari */ }
 }
+
+/* ================= self-update check =================
+ * GitHub Pages' CDN + the Home Screen app's cache can serve an old
+ * build for ~10 min. version.txt is fetched with caching bypassed; if
+ * it names a newer build than BUILD, a pill offers a one-tap reload.
+ * The pill never forces anything — reloading mid-session would drop
+ * session-only files, so the timing is Gabriel's choice. */
+let updateDismissed = '';
+let lastUpdCheck = 0;
+async function checkForUpdate() {
+  lastUpdCheck = Date.now();
+  try {
+    const r = await fetch('version.txt?cb=' + Date.now(), { cache: 'no-store' });
+    if (!r.ok) return;
+    const v = (await r.text()).trim();
+    if (!v || v === BUILD || v === updateDismissed) return;
+    const pill = $('#update-pill');
+    pill.innerHTML = 'New version ' + esc(v) + ' is ready — tap to update<span class="x" id="update-x">×</span>';
+    pill.classList.remove('hidden');
+    pill.onclick = (e) => { if (e.target.id !== 'update-x') location.reload(); };
+    const x = $('#update-x');
+    if (x) x.addEventListener('click', (e) => { e.stopPropagation(); updateDismissed = v; pill.classList.add('hidden'); });
+  } catch (e) { /* offline: ignore */ }
+}
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && Date.now() - lastUpdCheck > 5 * 60 * 1000) checkForUpdate();
+});
 
 /* Drag & drop (desktop convenience; harmless on iPhone) */
 window.addEventListener('dragover', (e) => e.preventDefault());
@@ -1451,6 +1694,8 @@ window.addEventListener('drop', (e) => { e.preventDefault(); importFiles(e.dataT
   await loadMeta();
   $('#sort').value = state.sort;
   applyTheme(state.theme, false);
+  applyRate();
+  checkForUpdate();
   const st = document.querySelector('header h1 small');
   if (st && !st.textContent.includes('build')) st.textContent += ' · build ' + BUILD;
   try {
