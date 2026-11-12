@@ -925,7 +925,7 @@ function render() {
  * variables and the waveform via peakColor(). Saved between launches. */
 const THEMES = ['green', 'miku', 'sonic', 'shadow', 'space'];
 const THEME_NAMES = { green: 'Localify', miku: 'Hatsune Miku', sonic: 'Sonic', shadow: 'Shadow', space: 'Space' };
-const BUILD = '4.7.2';
+const BUILD = '4.7.3';
 let peakColorCache = {};
 function applyTheme(name, save = true) {
   state.theme = THEMES.includes(name) ? name : 'green';
@@ -1087,13 +1087,22 @@ function drawSpec(s, f) {
   ctx.clearRect(0, 0, W, H);
   ctx.fillStyle = 'rgba(255,255,255,.10)';
   ctx.fillRect(0, H - 1, W, 1);
-  const bi = Math.min(s.spec.length - 1, Math.max(0, Math.floor(f * s.spec.length)));
+  /* Interpolate between neighbouring analysis buckets: on a long mix one
+     bucket spans many seconds, so stepping bucket-to-bucket made the
+     strip look frozen. The fractional position gives it continuous drift. */
+  const pos = f * s.spec.length;
+  const bi = Math.min(s.spec.length - 1, Math.max(0, Math.floor(pos)));
+  const frac = Math.min(1, Math.max(0, pos - Math.floor(pos)));
   const target = s.spec[bi] || [];
+  const targetNext = s.spec[Math.min(s.spec.length - 1, bi + 1)] || [];
   const playingNow = !audio.paused && !audio.ended;
   const bw = W / SPEC_BANDS;
   for (let k = 0; k < SPEC_BANDS; k++) {
-    const t = target[k] || 0;
-    specLevel[k] = playingNow ? specLevel[k] + (t - specLevel[k]) * (t > specLevel[k] ? 0.55 : 0.18) : t;
+    /* Sensitivity: a sqrt gain curve lifts mid/quiet bands so the bars
+       actually travel, instead of hovering near the floor. */
+    const raw = (target[k] || 0) * (1 - frac) + (targetNext[k] || 0) * frac;
+    const t = Math.min(1, Math.sqrt(raw) * 1.12);
+    specLevel[k] = playingNow ? specLevel[k] + (t - specLevel[k]) * (t > specLevel[k] ? 0.6 : 0.22) : t;
     const bh = Math.max(dpr, specLevel[k] * (H - 4 * dpr));
     ctx.fillStyle = 'hsl(' + Math.round(252 - k * 15.5) + ',90%,' + (50 + Math.round(specLevel[k] * 10)) + '%)';
     ctx.fillRect(k * bw + bw * 0.16, H - bh, Math.max(1, bw * 0.64), bh);
