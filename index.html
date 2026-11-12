@@ -178,8 +178,9 @@ main{padding:12px 12px calc(120px + var(--sab))}
 /* ---------- full player ---------- */
 #player{position:fixed;inset:0;z-index:40;background:var(--bg);overflow-y:auto;
   padding:calc(14px + var(--sat)) 22px calc(18px + var(--sab));display:flex;flex-direction:column}
+#player>*{flex-shrink:0}
 #player .close{align-self:flex-start;font-size:26px;color:var(--dim);padding:4px 8px}
-#player .part{width:min(72vw,320px);height:min(72vw,320px);margin:18px auto;border-radius:18px;
+#player .part{width:min(54vw,236px);height:min(54vw,236px);margin:10px auto;border-radius:18px;
   background:var(--panel2);display:flex;align-items:center;justify-content:center;font-size:84px;color:var(--dim);overflow:hidden}
 #player .part img{width:100%;height:100%;object-fit:cover}
 #player h2{margin:8px 0 2px;font-size:21px;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -231,7 +232,13 @@ main{padding:12px 12px calc(120px + var(--sab))}
 /* ---------- player extras: sleep + EQ ---------- */
 .eqrow{display:flex;align-items:center;gap:10px;margin-top:12px}
 .eqlab{color:var(--dim);font-size:13px;font-weight:700;letter-spacing:.06em}
-.eqchips{display:flex;gap:8px;flex-wrap:wrap}
+.eqchips{display:flex;gap:8px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding-bottom:2px;min-width:0}
+.eqchips::-webkit-scrollbar{display:none}
+.eqchips .eqchip{flex:none}
+.ptabs{display:flex;gap:6px;background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:4px;margin-top:14px}
+.ptab{flex:1;padding:7px 0;border-radius:999px;color:var(--dim);font-size:13.5px;font-weight:600}
+.ptab.on{background:var(--green);color:#04140a}
+.prow{margin-top:10px}
 .eqchip{padding:6px 13px;border-radius:999px;background:var(--panel2);border:1px solid var(--line);
   color:var(--dim);font-size:13px}
 .eqchip.on{background:var(--green);border-color:var(--green);color:#04140a;font-weight:700}
@@ -328,13 +335,18 @@ main{padding:12px 12px calc(120px + var(--sab))}
     <button class="pbtn skip" id="p-fwd30" aria-label="Forward 30 seconds">+30</button>
     <button class="pbtn" id="p-repeat" aria-label="Repeat"></button>
   </div>
-  <div class="eqrow"><span class="eqlab">THEME</span><div class="eqchips" id="theme-chips">
+  <div class="ptabs" id="p-tabs">
+    <button data-ptab="theme" class="ptab on">Theme</button>
+    <button data-ptab="speed" class="ptab">Speed</button>
+    <button data-ptab="cues" class="ptab">Cues</button>
+  </div>
+  <div class="eqrow prow" id="row-theme"><div class="eqchips" id="theme-chips">
     <button data-theme-name="green" class="eqchip on"><span class="tdot" style="background:#1ed760"></span>Localify</button><button data-theme-name="miku" class="eqchip"><span class="tdot" style="background:linear-gradient(90deg,#39c5bb 50%,#ff2e88 50%)"></span>Miku</button><button data-theme-name="sonic" class="eqchip"><span class="tdot" style="background:#2f7bff"></span>Sonic</button><button data-theme-name="shadow" class="eqchip"><span class="tdot" style="background:linear-gradient(90deg,#e10600 50%,#f5c518 50%)"></span>Shadow</button><button data-theme-name="space" class="eqchip"><span class="tdot" style="background:#8b7cff"></span>Space</button><button data-theme-name="soundcloud" class="eqchip"><span class="tdot" style="background:#ff5500"></span>SoundCloud</button><button data-theme-name="cdj" class="eqchip"><span class="tdot" style="background:#0096ff"></span>CDJ</button><button data-theme-name="vapor" class="eqchip"><span class="tdot" style="background:linear-gradient(90deg,#ff71ce 50%,#01cdfe 50%)"></span>Vaporwave</button><button data-theme-name="vinyl" class="eqchip"><span class="tdot" style="background:#e8a33d"></span>Vinyl</button>
   </div></div>
-  <div class="eqrow"><span class="eqlab">SPEED</span><div class="eqchips" id="speed-chips">
+  <div class="eqrow prow hidden" id="row-speed"><div class="eqchips" id="speed-chips">
     <button data-rate="0.8" class="eqchip">0.8×</button><button data-rate="1" class="eqchip on">1×</button><button data-rate="1.1" class="eqchip">1.1×</button><button data-rate="1.25" class="eqchip">1.25×</button><button data-rate="lock" class="eqchip on">Pitch lock</button>
   </div></div>
-  <div class="eqrow"><span class="eqlab">CUES</span><div class="eqchips" id="cue-chips"></div><button class="eqchip" id="cue-add">+ Cue</button></div>
+  <div class="eqrow prow hidden" id="row-cues"><div class="eqchips" id="cue-chips"></div><button class="eqchip" id="cue-add">+ Cue</button></div>
 </div>
 
 <div id="plWrap" class="hidden"><div id="plsheet">
@@ -1016,7 +1028,7 @@ function render() {
  * variables and the waveform via peakColor(). Saved between launches. */
 const THEMES = ['green', 'miku', 'sonic', 'shadow', 'space', 'soundcloud', 'cdj', 'vapor', 'vinyl'];
 const THEME_NAMES = { green: 'Localify', miku: 'Hatsune Miku', sonic: 'Sonic', shadow: 'Shadow', space: 'Space', soundcloud: 'SoundCloud', cdj: 'CDJ', vapor: 'Vaporwave', vinyl: 'Vinyl' };
-const BUILD = '5.0';
+const BUILD = '5.1';
 let peakColorCache = {};
 function applyTheme(name, save = true) {
   state.theme = THEMES.includes(name) ? name : 'green';
@@ -1595,6 +1607,14 @@ $('#speed-chips').addEventListener('click', (e) => {
     toast('Speed: ' + state.rate + '×');
   }
   saveMeta(); applyRate();
+});
+$('#p-tabs').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-ptab]'); if (!b) return;
+  const k = b.dataset.ptab;
+  document.querySelectorAll('#p-tabs .ptab').forEach((t) => t.classList.toggle('on', t === b));
+  $('#row-theme').classList.toggle('hidden', k !== 'theme');
+  $('#row-speed').classList.toggle('hidden', k !== 'speed');
+  $('#row-cues').classList.toggle('hidden', k !== 'cues');
 });
 $('#theme-chips').addEventListener('click', (e) => {
   const b = e.target.closest('[data-theme-name]'); if (!b) return;
