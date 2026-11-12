@@ -925,7 +925,7 @@ function render() {
  * variables and the waveform via peakColor(). Saved between launches. */
 const THEMES = ['green', 'miku', 'sonic', 'shadow', 'space'];
 const THEME_NAMES = { green: 'Localify', miku: 'Hatsune Miku', sonic: 'Sonic', shadow: 'Shadow', space: 'Space' };
-const BUILD = '4.7';
+const BUILD = '4.7.1';
 let peakColorCache = {};
 function applyTheme(name, save = true) {
   state.theme = THEMES.includes(name) ? name : 'green';
@@ -1075,13 +1075,13 @@ let specSongId = null;
 function drawSpec(s, f) {
   if (!specCv) return;
   if (!s || !s.spec || !s.spec.length) { specCv.style.display = 'none'; return; }
+  specCv.style.display = 'block'; /* must un-hide BEFORE measuring: a display:none canvas has no size */
   const rect = specCv.getBoundingClientRect();
   if (!rect.width) return;
   const dpr = window.devicePixelRatio || 1;
   const W = Math.round(rect.width * dpr), H = Math.round(rect.height * dpr);
   if (specCv.width !== W) specCv.width = W;
   if (specCv.height !== H) specCv.height = H;
-  specCv.style.display = 'block';
   if (specSongId !== s.id) { specSongId = s.id; specLevel = new Array(SPEC_BANDS).fill(0); }
   const ctx = specCv.getContext('2d');
   ctx.clearRect(0, 0, W, H);
