@@ -184,7 +184,7 @@ main{padding:12px 12px calc(120px + var(--sab))}
 .pbtn.main{background:var(--green);color:#04140a;font-size:19px}
 
 /* ---------- full player ---------- */
-#player{position:fixed;inset:0;z-index:40;background:var(--bg);overflow-y:auto;
+#player{position:fixed;inset:0;z-index:40;background:var(--bg);background:color-mix(in srgb, var(--bg) 88%, transparent);overflow-y:auto;
   padding:calc(14px + var(--sat)) 22px calc(18px + var(--sab));display:flex;flex-direction:column}
 #player>*{flex-shrink:0}
 #player .close{align-self:flex-start;font-size:26px;color:var(--dim);padding:4px 8px}
@@ -284,9 +284,117 @@ main{padding:12px 12px calc(120px + var(--sab))}
 #toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(12px + var(--sab));z-index:60;
   background:#1c2740;border:1px solid var(--line);color:var(--text);font-size:14px;
   padding:10px 16px;border-radius:999px;max-width:88vw;text-align:center;box-shadow:0 8px 24px rgba(0,0,0,.5)}
+
+/* ================= theme backgrounds (5.9) =================
+ * One fixed layer behind the whole player; the visible scene follows
+ * data-theme like everything else. Pure CSS transforms/opacity —
+ * no JS, no audio anything. Mid strength by design. */
+#bgfx{position:fixed;inset:0;z-index:0;overflow:hidden;pointer-events:none}
+main{position:relative;z-index:1}
+.bglayer{position:absolute;inset:0;display:none}
+[data-theme="green"] .bgl-green,
+[data-theme="miku"] .bgl-miku,
+[data-theme="sonic"] .bgl-sonic,
+[data-theme="shadow"] .bgl-shadow,
+[data-theme="space"] .bgl-space,
+[data-theme="soundcloud"] .bgl-soundcloud,
+[data-theme="cdj"] .bgl-cdj,
+[data-theme="vapor"] .bgl-vapor,
+[data-theme="vinyl"] .bgl-vinyl{display:block}
+@keyframes bgSpinY{from{transform:rotateY(0deg)}to{transform:rotateY(360deg)}}
+@keyframes bgBounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-18px)}}
+@keyframes bgRot{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+@keyframes bgBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-9px)}}
+@keyframes bgRise{0%{transform:translateY(0);opacity:0}10%{opacity:.4}88%{opacity:.4}100%{transform:translateY(-106vh);opacity:0}}
+@keyframes bgDrift{from{left:-180px}to{left:102%}}
+@keyframes bgTwinkle{0%,100%{opacity:.25}50%{opacity:.85}}
+@keyframes bgSway{0%,100%{transform:rotate(-7deg)}50%{transform:rotate(7deg)}}
+@keyframes bgWander{0%{transform:translate(0,0)}33%{transform:translate(44vw,10vh)}66%{transform:translate(10vw,52vh)}100%{transform:translate(52vw,38vh)}}
+@keyframes bgPulse{0%,100%{opacity:.25}50%{opacity:.9}}
+@keyframes bgGridMove{from{background-position:0 0,0 0}to{background-position:0 26px,0 0}}
+.bgringw{position:absolute;animation:bgBounce 2.6s ease-in-out infinite}
+.bgring{border-radius:50%;border:7px solid #ffd23e;box-shadow:0 0 20px rgba(255,210,62,.55),inset 0 0 12px rgba(255,210,62,.55);animation:bgSpinY 1.7s linear infinite}
+.bgl-shadow .bgring{border-color:#d9a514;box-shadow:0 0 22px rgba(225,6,0,.55),inset 0 0 12px rgba(225,6,0,.45);animation-duration:2.8s}
+.bgl-shadow .bgringw{animation-duration:3.8s}
+.bgcloud{position:absolute;width:130px;height:38px;border-radius:999px;background:#fff;opacity:.13;animation:bgDrift linear infinite}
+.bgcloud:before,.bgcloud:after{content:'';position:absolute;background:#fff;border-radius:50%}
+.bgcloud:before{width:60px;height:60px;top:-28px;left:18px}
+.bgcloud:after{width:40px;height:40px;top:-18px;right:18px}
+.bgdisc{position:absolute;border-radius:50%;opacity:.8;background:radial-gradient(circle,#e8a33d 0 17%,#151310 17.5% 19%,transparent 19.5%),repeating-radial-gradient(circle,#0a0a0a 0 2px,#202020 2px 4px);animation:bgRot 7s linear infinite}
+.bgdisc:before{content:'';position:absolute;inset:0;border-radius:50%;background:conic-gradient(from 25deg,rgba(255,255,255,.12),transparent 32%,rgba(255,255,255,.05) 58%,transparent 74%)}
+.bgnote{position:absolute;bottom:-46px;font-weight:700;animation:bgRise linear infinite}
+.bgleek{position:absolute;transform-origin:50% 100%;animation:bgSway 3.6s ease-in-out infinite}
+.bgleek.flip{animation:bgSpinY 5s linear infinite}
+.bgm01{position:absolute;left:4%;top:6%;color:#e60012;opacity:.15;font-weight:900;line-height:.85;animation:bgWander 30s ease-in-out infinite alternate}
+.bgm01 .n{font-size:110px;letter-spacing:-4px}
+.bgm01 .t{font-size:17px;letter-spacing:.5px}
+.bgstars{position:absolute;inset:0;animation:bgTwinkle 3.4s ease-in-out infinite}
+.bgstars.s2{animation-duration:5.1s;animation-delay:-2.2s}
+.bgplanet{position:absolute;width:92px;height:92px;border-radius:50%;background:radial-gradient(circle at 34% 32%,#c4b5fd,#7c6cf0 46%,#3b2f7a);animation:bgBob 7s ease-in-out infinite}
+.bgplanet:after{content:'';position:absolute;width:154%;height:44%;left:-27%;top:30%;border:2px solid rgba(125,211,252,.5);border-radius:50%;transform:rotate(-18deg)}
+.bggalaxy{position:absolute;width:160px;height:160px;border-radius:50%;filter:blur(6px);opacity:.5;background:conic-gradient(from 0deg,transparent,rgba(139,124,255,.55) 12%,transparent 30%,rgba(125,211,252,.4) 46%,transparent 62%,rgba(139,124,255,.45) 82%,transparent);animation:bgRot 70s linear infinite}
+.bggalaxy:before{content:'';position:absolute;inset:38%;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.85),transparent 70%)}
+.bgjog{position:absolute;width:190px;height:190px;border-radius:50%;border:10px solid #2a3442;box-shadow:0 0 24px rgba(0,150,255,.18),inset 0 0 0 3px rgba(160,190,220,.25);animation:bgRot 14s linear infinite}
+.bgjog:before{content:'';position:absolute;inset:16px;border-radius:50%;border:2px dashed rgba(0,150,255,.4)}
+.bgjog:after{content:'';position:absolute;left:50%;top:6px;width:8px;height:8px;margin-left:-4px;border-radius:50%;background:#dbeafe}
+.bgcudot{position:absolute;width:9px;height:9px;border-radius:50%;animation:bgPulse 2.2s ease-in-out infinite}
+.bgsun{position:absolute;width:118px;height:118px;border-radius:50%;opacity:.55;background:repeating-linear-gradient(180deg,transparent 0 11px,rgba(21,8,38,.5) 11px 14px),linear-gradient(180deg,#ffd319,#ff2975 62%,#ff71ce);animation:bgBob 8s ease-in-out infinite}
+.bggrid{position:absolute;left:-30%;right:-30%;bottom:-4%;height:30%;opacity:.4;background-image:linear-gradient(rgba(1,205,254,.4) 1px,transparent 1px),linear-gradient(90deg,rgba(1,205,254,.4) 1px,transparent 1px);background-size:100% 26px,34px 100%;transform:perspective(240px) rotateX(62deg);transform-origin:bottom;animation:bgGridMove 1.5s linear infinite}
+@media (prefers-reduced-motion: reduce){#bgfx *{animation:none !important}}
 </style>
 </head>
 <body>
+
+<div id="bgfx" aria-hidden="true">
+  <div class="bglayer bgl-green">
+    <span class="bgnote" style="left:10%;font-size:30px;color:#1ed760;animation-duration:24s">♪</span>
+    <span class="bgnote" style="left:32%;font-size:22px;color:#ffb020;animation-duration:31s;animation-delay:-12s">♫</span>
+    <span class="bgnote" style="left:58%;font-size:36px;color:#1ed760;animation-duration:27s;animation-delay:-6s">♪</span>
+    <span class="bgnote" style="left:82%;font-size:24px;color:#7ee2a8;animation-duration:34s;animation-delay:-20s">♩</span>
+  </div>
+  <div class="bglayer bgl-miku">
+    <div class="bgm01"><div class="n">01</div><div class="t">HatsuneMiku.</div></div>
+    <svg class="bgleek" style="left:7%;bottom:9%;width:44px" viewBox="0 0 40 104"><path d="M20 44 C9 30 5 16 7 4" stroke="#43a047" stroke-width="5" fill="none" stroke-linecap="round"/><path d="M20 44 C20 28 20 12 20 2" stroke="#66bb6a" stroke-width="5" fill="none" stroke-linecap="round"/><path d="M20 44 C31 30 35 16 33 4" stroke="#2e7d32" stroke-width="5" fill="none" stroke-linecap="round"/><rect x="15.5" y="42" width="9" height="58" rx="4.5" fill="#eef7e6"/><rect x="15.5" y="42" width="9" height="12" fill="#7cb342"/></svg>
+    <svg class="bgleek flip" style="right:10%;top:15%;width:34px" viewBox="0 0 40 104"><path d="M20 44 C9 30 5 16 7 4" stroke="#43a047" stroke-width="5" fill="none" stroke-linecap="round"/><path d="M20 44 C20 28 20 12 20 2" stroke="#66bb6a" stroke-width="5" fill="none" stroke-linecap="round"/><path d="M20 44 C31 30 35 16 33 4" stroke="#2e7d32" stroke-width="5" fill="none" stroke-linecap="round"/><rect x="15.5" y="42" width="9" height="58" rx="4.5" fill="#eef7e6"/><rect x="15.5" y="42" width="9" height="12" fill="#7cb342"/></svg>
+    <svg class="bgleek" style="right:24%;bottom:22%;width:28px;animation-delay:-1.8s" viewBox="0 0 40 104"><path d="M20 44 C9 30 5 16 7 4" stroke="#43a047" stroke-width="5" fill="none" stroke-linecap="round"/><path d="M20 44 C20 28 20 12 20 2" stroke="#66bb6a" stroke-width="5" fill="none" stroke-linecap="round"/><path d="M20 44 C31 30 35 16 33 4" stroke="#2e7d32" stroke-width="5" fill="none" stroke-linecap="round"/><rect x="15.5" y="42" width="9" height="58" rx="4.5" fill="#eef7e6"/><rect x="15.5" y="42" width="9" height="12" fill="#7cb342"/></svg>
+    <span class="bgnote" style="left:44%;font-size:24px;color:#ff4d9d;animation-duration:26s;animation-delay:-9s">♪</span>
+    <span class="bgnote" style="left:70%;font-size:20px;color:#39c5bb;animation-duration:30s;animation-delay:-17s">♫</span>
+  </div>
+  <div class="bglayer bgl-sonic">
+    <div class="bgringw" style="left:6%;top:11%"><div class="bgring" style="width:66px;height:66px"></div></div>
+    <div class="bgringw" style="right:8%;top:37%;animation-delay:-1.2s"><div class="bgring" style="width:44px;height:44px;border-width:6px;animation-delay:-.7s"></div></div>
+    <div class="bgringw" style="left:13%;bottom:13%;animation-delay:-.6s"><div class="bgring" style="width:34px;height:34px;border-width:5px;animation-delay:-1.1s"></div></div>
+  </div>
+  <div class="bglayer bgl-shadow">
+    <div class="bgringw" style="right:8%;top:10%"><div class="bgring" style="width:58px;height:58px"></div></div>
+    <div class="bgringw" style="left:9%;top:43%;animation-delay:-1.9s"><div class="bgring" style="width:38px;height:38px;border-width:5px;animation-delay:-1.4s"></div></div>
+  </div>
+  <div class="bglayer bgl-space">
+    <div class="bgstars" style="background-image:radial-gradient(2px 2px at 12% 20%,#fff,transparent),radial-gradient(1.5px 1.5px at 28% 64%,#c4b5fd,transparent),radial-gradient(2px 2px at 44% 12%,#fff,transparent),radial-gradient(1.5px 1.5px at 57% 40%,#7dd3fc,transparent),radial-gradient(2px 2px at 68% 78%,#fff,transparent),radial-gradient(1.5px 1.5px at 76% 26%,#fff,transparent),radial-gradient(2px 2px at 84% 56%,#c4b5fd,transparent),radial-gradient(1.5px 1.5px at 92% 14%,#fff,transparent),radial-gradient(1.5px 1.5px at 36% 86%,#fff,transparent),radial-gradient(2px 2px at 6% 58%,#7dd3fc,transparent)"></div>
+    <div class="bgstars s2" style="background-image:radial-gradient(1.5px 1.5px at 20% 44%,#fff,transparent),radial-gradient(2px 2px at 33% 8%,#7dd3fc,transparent),radial-gradient(1.5px 1.5px at 49% 70%,#fff,transparent),radial-gradient(2px 2px at 63% 18%,#c4b5fd,transparent),radial-gradient(1.5px 1.5px at 71% 90%,#fff,transparent),radial-gradient(1.5px 1.5px at 88% 36%,#fff,transparent),radial-gradient(2px 2px at 95% 66%,#7dd3fc,transparent),radial-gradient(1.5px 1.5px at 4% 84%,#fff,transparent)"></div>
+    <div class="bgplanet" style="right:8%;top:9%"></div>
+    <div class="bggalaxy" style="left:5%;bottom:10%"></div>
+  </div>
+  <div class="bglayer bgl-soundcloud">
+    <div class="bgcloud" style="top:8%;animation-duration:52s"></div>
+    <div class="bgcloud" style="top:32%;width:88px;height:26px;opacity:.08;animation-duration:74s;animation-delay:-30s"></div>
+    <div class="bgcloud" style="top:58%;width:170px;height:48px;opacity:.06;animation-duration:96s;animation-delay:-58s"></div>
+  </div>
+  <div class="bglayer bgl-cdj">
+    <div class="bgjog" style="right:-62px;bottom:11%"></div>
+    <span class="bgcudot" style="left:10%;top:22%;background:#0096ff"></span>
+    <span class="bgcudot" style="left:16%;top:30%;background:#ffffff;animation-delay:-.7s"></span>
+    <span class="bgcudot" style="left:8%;top:38%;background:#7dd3fc;animation-delay:-1.3s"></span>
+  </div>
+  <div class="bglayer bgl-vapor">
+    <div class="bgsun" style="left:7%;top:10%"></div>
+    <div class="bggrid"></div>
+  </div>
+  <div class="bglayer bgl-vinyl">
+    <div class="bgdisc" style="width:230px;height:230px;right:-70px;bottom:-60px"></div>
+    <div class="bgdisc" style="width:120px;height:120px;left:-36px;top:5%;animation-duration:9.5s;opacity:.55"></div>
+  </div>
+</div>
 
 <header>
   <div class="brand">
@@ -619,6 +727,9 @@ document.addEventListener('pointerdown', () => {
    repeats for that version. Add an entry here for every release
    that ships user-visible changes. */
 const CHANGELOG = {
+  '5.9': [
+    'New: every theme gets an animated background across the whole player — spinning, bouncing rings for Sonic and Shadow, a drifting cloud for SoundCloud, turning records for Vinyl, leeks and a wandering 01 for Miku, stars, a planet and a galaxy for Space, plus matching scenes for Localify, CDJ and Vaporwave',
+  ],
   '5.8': [
     'New: + Folder button in the header — pick a whole folder from Files and every audio file inside it (subfolders included) is added at once',
   ],
@@ -1255,7 +1366,7 @@ function render() {
  * variables and the waveform via peakColor(). Saved between launches. */
 const THEMES = ['green', 'miku', 'sonic', 'shadow', 'space', 'soundcloud', 'cdj', 'vapor', 'vinyl'];
 const THEME_NAMES = { green: 'Localify', miku: 'Hatsune Miku', sonic: 'Sonic', shadow: 'Shadow', space: 'Space', soundcloud: 'SoundCloud', cdj: 'CDJ', vapor: 'Vaporwave', vinyl: 'Vinyl' };
-const BUILD = '5.8';
+const BUILD = '5.9';
 let peakColorCache = {};
 function applyTheme(name, save = true) {
   state.theme = THEMES.includes(name) ? name : 'green';
