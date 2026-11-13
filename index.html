@@ -318,6 +318,7 @@ main{padding:12px 12px calc(120px + var(--sab))}
 @keyframes bgGridIn{from{transform:translateY(0)}to{transform:translateY(34px)}}
 @keyframes bgScroll{from{transform:translateX(0)}to{transform:translateX(-96px)}}
 @keyframes bgFlicker{0%,100%{opacity:.8}45%{opacity:1}55%{opacity:.6}}
+@keyframes bgGemFloat{0%,100%{transform:translateY(0) rotate(-5deg)}50%{transform:translateY(-13px) rotate(5deg)}}
 .wash{inset:0}
 
 /* shared pieces */
@@ -350,6 +351,10 @@ main{padding:12px 12px calc(120px + var(--sab))}
 .bgl-shadow .bgring{border-color:#d9a514;box-shadow:0 0 22px rgba(225,6,0,.6),inset 0 0 12px rgba(225,6,0,.45);animation-duration:2.8s}
 .bgl-shadow .bgringw{animation-duration:3.8s}
 .bgember{background:radial-gradient(circle,#ffb347,#e10600 60%,transparent 72%)}
+.bgemerald{opacity:.9;animation:bgGemFloat 6s ease-in-out infinite}
+.bgemerald:before{content:'';position:absolute;inset:-50%;border-radius:50%;background:radial-gradient(circle,var(--c),transparent 65%);opacity:.26}
+.bgemerald i{position:absolute;inset:0;clip-path:polygon(50% 0,88% 22%,100% 56%,50% 100%,0 56%,12% 22%);background:linear-gradient(115deg,transparent 45%,rgba(255,255,255,.55) 50%,transparent 55%),linear-gradient(245deg,transparent 45%,rgba(0,0,0,.20) 50%,transparent 55%),linear-gradient(180deg,rgba(255,255,255,.38),rgba(0,0,0,.24)),var(--c)}
+.bgemerald i:after{content:'';position:absolute;left:27%;right:27%;top:15%;height:32%;background:rgba(255,255,255,.42);clip-path:polygon(50% 0,100% 42%,50% 100%,0 42%)}
 
 /* Space: nebula, three star layers, shooting stars, planet */
 .bgl-space .wash{background:linear-gradient(180deg,rgba(10,6,40,.0),rgba(30,16,80,.35))}
@@ -500,6 +505,13 @@ main{padding:12px 12px calc(120px + var(--sab))}
     <span class="bgdot bgember" style="left:89%;width:3.6px;height:3.6px;background-color:#ffb347;animation-duration:11.3s;animation-delay:-8.3s;--dx:-0.4vw;--o:0.8"></span>
     <span class="bgdot bgember" style="left:17%;width:6.7px;height:6.7px;background-color:#ffb347;animation-duration:7.1s;animation-delay:-11.2s;--dx:3.6vw;--o:0.8"></span>
     <span class="bgdot bgember" style="left:74%;width:3.4px;height:3.4px;background-color:#ffb347;animation-duration:10.0s;animation-delay:-12.2s;--dx:5.2vw;--o:0.8"></span>
+    <span class="bgemerald" style="--c:#37e05a;left:6%;top:15%;width:34px;height:38px;animation-duration:6.2s;animation-delay:-0.4s"><i></i></span>
+    <span class="bgemerald" style="--c:#f43a3a;right:7%;top:8%;width:28px;height:31px;animation-duration:5.6s;animation-delay:-2.1s"><i></i></span>
+    <span class="bgemerald" style="--c:#3a7bff;left:11%;bottom:18%;width:26px;height:29px;animation-duration:7s;animation-delay:-1.2s"><i></i></span>
+    <span class="bgemerald" style="--c:#ffd23e;right:12%;bottom:27%;width:32px;height:36px;animation-duration:6.6s;animation-delay:-3.3s"><i></i></span>
+    <span class="bgemerald" style="--c:#a55eea;left:43%;top:3%;width:24px;height:27px;animation-duration:5.9s;animation-delay:-0.9s"><i></i></span>
+    <span class="bgemerald" style="--c:#39d5e8;right:36%;bottom:5%;width:26px;height:29px;animation-duration:6.9s;animation-delay:-4.2s"><i></i></span>
+    <span class="bgemerald" style="--c:#e8ecf4;right:22%;top:47%;width:22px;height:25px;animation-duration:5.4s;animation-delay:-1.7s"><i></i></span>
     <div class="bgringw" style="right:8%;top:10%;animation-delay:-0s"><div class="bgring" style="width:58px;height:58px;border-width:7px;animation-delay:-0s"></div></div>
     <div class="bgringw" style="left:9%;top:43%;animation-delay:-1.9s"><div class="bgring" style="width:38px;height:38px;border-width:5px;animation-delay:-1.4s"></div></div>
     <div class="bgringw" style="right:20%;bottom:20%;animation-delay:-0.8s"><div class="bgring" style="width:44px;height:44px;border-width:6px;animation-delay:-0.6s"></div></div>
@@ -844,6 +856,9 @@ document.addEventListener('pointerdown', () => {
    repeats for that version. Add an entry here for every release
    that ships user-visible changes. */
 const CHANGELOG = {
+  '5.9.5': [
+    'New: the seven Chaos Emeralds now drift through the Shadow theme background, one in each colour, faceted and glowing',
+  ],
   '5.9.4': [
     'Improved: the dancers turn at one steady speed (no more stall twice a bar), blend smoothly between poses, hop with a squash-and-stretch landing on every beat, stand on a soft shadow and glow in the theme colour',
   ],
@@ -1496,7 +1511,7 @@ function render() {
  * variables and the waveform via peakColor(). Saved between launches. */
 const THEMES = ['green', 'miku', 'sonic', 'shadow', 'space', 'soundcloud', 'cdj', 'vapor', 'vinyl'];
 const THEME_NAMES = { green: 'Localify', miku: 'Hatsune Miku', sonic: 'Sonic', shadow: 'Shadow', space: 'Space', soundcloud: 'SoundCloud', cdj: 'CDJ', vapor: 'Vaporwave', vinyl: 'Vinyl' };
-const BUILD = '5.9.4';
+const BUILD = '5.9.5';
 let peakColorCache = {};
 function applyTheme(name, save = true) {
   state.theme = THEMES.includes(name) ? name : 'green';
