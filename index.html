@@ -271,6 +271,13 @@ main{padding:12px 12px calc(120px + var(--sab))}
 #sheet button{display:block;width:100%;text-align:left;padding:13px 6px;font-size:15.5px;border-bottom:1px solid var(--line)}
 #sheet button:last-child{border-bottom:0}
 #sheet button.danger{color:var(--red)}
+#sheet .sheetnote{font-size:13.5px;opacity:.75;margin:2px 0 10px;line-height:1.45}
+#sheet .duprow{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line)}
+#sheet .duprow .dupmeta{flex:1;min-width:0}
+#sheet .duprow .dupmeta b{display:block;font-size:14.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#sheet .duprow .dupmeta span{font-size:12.5px;opacity:.7}
+#sheet .duprow button{width:auto;border:1px solid var(--line);border-radius:999px;padding:7px 13px;font-size:13.5px;color:var(--red)}
+#sheet .dupsep{height:10px}
 /* ---------- playlist form ---------- */
 #plWrap{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.55);display:flex;align-items:flex-end}
 #plsheet{background:var(--panel);width:100%;border-radius:18px 18px 0 0;padding:14px 16px calc(16px + var(--sab))}
@@ -414,6 +421,8 @@ main{padding:12px 12px calc(120px + var(--sab))}
       <option value="artist">Artist A–Z</option>
       <option value="recent">Recently added</option>
       <option value="size-desc">Largest first</option>
+      <option value="most">Most played</option>
+      <option value="played">Recently played</option>
     </select>
   </div>
   <div class="chips" id="chips"></div>
@@ -605,14 +614,15 @@ main{padding:12px 12px calc(120px + var(--sab))}
     <button data-rate="0.8" class="eqchip">0.8×</button><button data-rate="1" class="eqchip on">1×</button><button data-rate="1.1" class="eqchip">1.1×</button><button data-rate="1.25" class="eqchip">1.25×</button><button data-rate="lock" class="eqchip on">Pitch lock</button>
   </div></div>
   <div class="eqrow prow hidden" id="row-cues"><div class="eqchips" id="cue-chips"></div><button class="eqchip" id="cue-add">+ Cue</button></div>
-  <div class="eqrow prow hidden" id="row-wave"><div class="eqchips" id="wave-chips"><button data-wave="bands" class="eqchip on">3-Band scroll</button><button data-wave="led" class="eqchip">LED bars</button><button data-wave="curve" class="eqchip">Curve</button></div></div>
-  <div class="eqrow prow hidden" id="row-stage"><div class="eqchips" id="stage-chips"><button data-stage="art" class="eqchip on">Artwork</button><button data-stage="ring" class="eqchip">Ring</button><button data-stage="spectrum" class="eqchip">Spectrum</button><button data-stage="waterfall" class="eqchip">Waterfall</button></div></div>
+  <div class="eqrow prow hidden" id="row-wave"><div class="eqchips" id="wave-chips"><button data-wave="bands" class="eqchip on">3-Band scroll</button><button data-wave="led" class="eqchip">LED bars</button><button data-wave="curve" class="eqchip">Curve</button><button data-waveshape class="eqchip">Shape: Peaks</button></div></div>
+  <div class="eqrow prow hidden" id="row-stage"><div class="eqchips" id="stage-chips"><button data-stage="art" class="eqchip on">Artwork</button><button data-stage="ring" class="eqchip">Ring</button><button data-stage="spectrum" class="eqchip">Spectrum</button><button data-stage="waterfall" class="eqchip">Waterfall</button><button data-stage="mirror" class="eqchip">Mirror</button><button data-stage="scope" class="eqchip">Scope</button><button data-stage="particles" class="eqchip">Particles</button></div></div>
   <div class="eqrow prow hidden" id="row-dance"><div class="eqchips" id="dance-chips">
     <button class="eqchip on" id="dancer-toggle">Dancer on</button>
     <button class="eqchip" id="bpm-down">−</button>
     <span class="eqchip" id="bpm-val">145 BPM</span>
     <button class="eqchip" id="bpm-up">+</button>
     <button class="eqchip" id="bpm-tap">Tap tempo</button>
+    <button class="eqchip" id="bpm-auto">Auto</button>
     <button class="eqchip" id="bpm-half">÷2 Halve</button>
     <button class="eqchip" data-bpm-preset="140">140</button>
     <button class="eqchip" data-bpm-preset="145">145</button>
@@ -781,6 +791,7 @@ const state = {
   rate: 1, pitchLock: true,
   waveStyle: 'bands',
   stageStyle: 'art',
+  waveMode: 'peaks',
   dancer: true,
   importing: null,
   currentId: null,
@@ -796,7 +807,7 @@ function saveMeta() {
     playlists: state.playlists,
     sort: state.sort, shuffle: state.shuffle, repeat: state.repeat,
     theme: state.theme, currentId: state.currentId, rate: state.rate, pitchLock: state.pitchLock,
-    dancer: state.dancer !== false, seenBuild: state.seenBuild || null, waveStyle: state.waveStyle || 'bands', stageStyle: state.stageStyle || 'art',
+    dancer: state.dancer !== false, seenBuild: state.seenBuild || null, waveStyle: state.waveStyle || 'bands', stageStyle: state.stageStyle || 'art', waveMode: state.waveMode || 'peaks',
   }}).catch(() => {});
 }
 async function loadMeta() {
@@ -813,7 +824,8 @@ async function loadMeta() {
     state.dancer = v.dancer !== false;
     state.seenBuild = v.seenBuild || null;
     state.waveStyle = ['bands', 'led', 'curve'].includes(v.waveStyle) ? v.waveStyle : 'bands';
-    state.stageStyle = ['art', 'ring', 'spectrum', 'waterfall'].includes(v.stageStyle) ? v.stageStyle : 'art';
+    state.stageStyle = ['art', 'ring', 'spectrum', 'waterfall', 'mirror', 'scope', 'particles'].includes(v.stageStyle) ? v.stageStyle : 'art';
+    state.waveMode = v.waveMode === 'rms' ? 'rms' : 'peaks';
     state.currentId = v.currentId || null;
   } catch (e) { /* first run */ }
 }
@@ -856,6 +868,13 @@ document.addEventListener('pointerdown', () => {
    repeats for that version. Add an entry here for every release
    that ships user-visible changes. */
 const CHANGELOG = {
+  '5.10': [
+    'New: Auto BPM for WAV songs (Dance tab, or automatic on first play) with a beatgrid — the dancer locks to the first beat, beat ticks line the waveform, and new cues snap to the beat',
+    'New stage styles: Mirror, Scope (a real oscilloscope trace) and Particles — and the stage no longer flashes back to the artwork on skip or seek',
+    'New: pinch to zoom the waveform (double-tap resets), plus a Peaks / RMS shape toggle in the Wave tab',
+    'New: play counts on every song, Most played and Recently played sorts, and a Duplicates finder in the library chips',
+    'Fixed: the last seconds of a song no longer stretch in the scrolling strip and stage',
+  ],
   '5.9.5': [
     'New: the seven Chaos Emeralds now drift through the Shadow theme background, one in each colour, faceted and glowing',
   ],
@@ -938,7 +957,8 @@ function exportBackup() {
   const data = { app: 'localify', kind: 'library-backup', version: 1, build: BUILD, exportedAt: new Date().toISOString(), playlists: [], songs: [] };
   for (const s of state.songs) {
     data.songs.push({ key: songKey(s), fileName: s.fileName, size: s.size, title: s.title,
-      favorite: state.favorites.has(s.id), cues: Array.isArray(s.cues) ? s.cues : [], pos: s.pos || 0, bpm: s.bpm || 0 });
+      favorite: state.favorites.has(s.id), cues: Array.isArray(s.cues) ? s.cues : [], pos: s.pos || 0, bpm: s.bpm || 0,
+      plays: s.plays || 0, lastPlayed: s.lastPlayed || 0, beatOffset: s.beatOffset != null ? s.beatOffset : null, bpmExact: s.bpmExact || 0 });
   }
   data.playlists = state.playlists.map((pl) => ({ name: pl.name,
     keys: pl.ids.map((id) => { const s = state.byId.get(id); return s ? songKey(s) : null; }).filter(Boolean) }));
@@ -967,6 +987,9 @@ async function importBackup(file) {
       }
       if (entry.pos > 5 && !(s.pos > 5)) s.pos = entry.pos;
       if (entry.bpm >= 40 && entry.bpm <= 200 && !s.bpm) s.bpm = entry.bpm;
+      if (entry.plays > (s.plays || 0)) s.plays = entry.plays;
+      if (entry.lastPlayed > (s.lastPlayed || 0)) s.lastPlayed = entry.lastPlayed;
+      if (s.beatOffset == null && entry.beatOffset != null) { s.beatOffset = entry.beatOffset; if (entry.bpmExact) s.bpmExact = entry.bpmExact; }
       DB.put('tracks', s).catch(() => {});
     }
     for (const pl of data.playlists || []) {
@@ -1084,6 +1107,7 @@ async function computeWavPeaks(r, info, buckets) {
   const perBucket = frames / buckets;
   const winFrames = Math.min(4096, Math.max(256, Math.floor(perBucket)));
   const peaks = new Array(buckets).fill(0);
+  const rmsSq = new Array(buckets).fill(0), rmsN = new Array(buckets).fill(0);
   const dv = (buf) => new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
   const sampleAt = (view, buf, o) => {
     if (fmt === 3) return view.getFloat32(o, true);
@@ -1107,15 +1131,18 @@ async function computeWavPeaks(r, info, buckets) {
       const buf = await r.read(pos, len);
       const view = dv(buf);
       for (let o = 0; o + bps <= buf.length; o += bps) {
-        const v = Math.abs(sampleAt(view, buf, o));
+        const sv = sampleAt(view, buf, o);
+        const v = Math.abs(sv);
         if (v > peak) peak = v;
+        rmsSq[b] += sv * sv; rmsN[b]++;
       }
       if (peak >= 0.999) break;
     }
     peaks[b] = Math.round(Math.min(1, peak) * 1000) / 1000;
     if (b % 40 === 39) await tick();
   }
-  return peaks;
+  const rms = rmsSq.map((sq, i) => Math.round(Math.min(1, Math.sqrt(sq / Math.max(1, rmsN[i]))) * 1000) / 1000);
+  return { peaks, rms };
 }
 
 /* Fine-grained peaks + 3-band levels for a short window (the scrolling strip): reads the
@@ -1161,8 +1188,9 @@ async function computeFinePeaks(r, info, t0, t1, buckets) {
   const startFrame = Math.max(0, Math.floor(t0 * sr));
   const endFrame = Math.min(totalFrames, Math.ceil(t1 * sr));
   const out = new Float32Array(buckets);
+  const wv = new Float32Array(buckets);
   const bLow = new Float32Array(buckets), bMid = new Float32Array(buckets), bHigh = new Float32Array(buckets);
-  if (endFrame <= startFrame) return { peaks: out, low: bLow, mid: bMid, high: bHigh, spec: null };
+  if (endFrame <= startFrame) return { peaks: out, wave: wv, low: bLow, mid: bMid, high: bHigh, spec: null };
   /* Cheap 3-band split riding the same decode pass: two one-pole
      low-passes (250 Hz / 4 kHz). low = lp250, mid = lp4k - lp250,
      high = signal - lp4k. No FFT, no extra reads. */
@@ -1197,7 +1225,7 @@ async function computeFinePeaks(r, info, t0, t1, buckets) {
     }
     specRaw.push(row);
   }
-  const perBucket = (endFrame - startFrame) / buckets;
+  const perBucket = ((t1 - t0) * sr) / buckets;
   const dv = (buf) => new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
   const sampleAt = (view, buf, o) => {
     if (fmt === 3) return view.getFloat32(o, true);
@@ -1222,6 +1250,7 @@ async function computeFinePeaks(r, info, t0, t1, buckets) {
       const v = Math.abs(mono);
       const b = Math.min(buckets - 1, Math.floor((framePos + fr - startFrame) / perBucket));
       if (v > out[b]) out[b] = v;
+      if (v > Math.abs(wv[b])) wv[b] = mono;
       lp1 += a1 * (mono - lp1);
       lp2 += a2 * (mono - lp2);
       const lv = Math.abs(lp1), mv = Math.abs(lp2 - lp1), hv = Math.abs(mono - lp2);
@@ -1246,7 +1275,7 @@ async function computeFinePeaks(r, info, t0, t1, buckets) {
       spec = { bands: SPEC_BANDS, sliceDur: sliceEvery / sr, data };
     }
   }
-  return { peaks: out, low: bLow, mid: bMid, high: bHigh, spec };
+  return { peaks: out, wave: wv, low: bLow, mid: bMid, high: bHigh, spec };
 }
 
 async function peaksForFile(file) {
@@ -1322,7 +1351,7 @@ async function readTags(file) {
     if (lower.endsWith('.wav') || lower.endsWith('.aif') || lower.endsWith('.aiff')) {
       info = await parseWav(r);
       if (lower.endsWith('.wav') && info.dataStart) {
-        try { info.peaks = await computeWavPeaks(r, info); } catch (e) { /* peaks are decorative */ }
+        try { const wp = await computeWavPeaks(r, info); info.peaks = wp && wp.peaks; info.rms = wp && wp.rms; } catch (e) { /* peaks are decorative */ }
       }
     }
     else if (lower.endsWith('.flac')) info = await parseFlac(r);
@@ -1336,6 +1365,7 @@ async function readTags(file) {
     album: (info.album || '').trim() || '',
     duration: Math.round((duration || 0) * 10) / 10,
     peaks: info.peaks || null,
+    rms: info.rms || null,
   };
 }
 
@@ -1393,7 +1423,7 @@ async function importOneFile(file) {
   const record = {
     id, title: info.title, artist: info.artist, album: info.album,
     duration: info.duration, size: file.size, mime: file.type || '',
-    fileName: file.name, addedAt: Date.now(), peaks: info.peaks || null,
+    fileName: file.name, addedAt: Date.now(), peaks: info.peaks || null, rms: info.rms || null,
     persisted: false, sessionOnly: true, needsFile: false,
   };
   await saveTrackAudio(record, file);
@@ -1446,6 +1476,8 @@ function visibleSongs() {
     by === 'artist' ? (a.artist + a.title).localeCompare(b.artist + b.title) :
     by === 'recent' ? (b.addedAt || 0) - (a.addedAt || 0) :
     by === 'size-desc' ? (b.size || 0) - (a.size || 0) :
+    by === 'most' ? (b.plays || 0) - (a.plays || 0) :
+    by === 'played' ? (b.lastPlayed || 0) - (a.lastPlayed || 0) :
     a.title.localeCompare(b.title));
   return list;
 }
@@ -1454,6 +1486,7 @@ function renderChips() {
   const chips = [{ k: 'all', label: 'All songs' }, { k: 'fav', label: 'Favorites', ic: 'heartFill' }];
   state.playlists.forEach((pl, i) => chips.push({ k: 'pl:' + i, label: pl.name }));
   chips.push({ k: '__newpl', label: '+ Playlist' });
+  chips.push({ k: '__dup', label: 'Duplicates' });
   chips.push({ k: '__backup', label: 'Export backup' });
   chips.push({ k: '__restore', label: 'Import backup' });
   $('#chips').innerHTML = chips.map((c) =>
@@ -1488,7 +1521,7 @@ function render() {
       <div class="art">${art}</div>
       <div class="meta">
         <div class="title">${esc(s.title)}${badge}</div>
-        <div class="sub">${esc(s.artist)}${s.album ? ' · ' + esc(s.album) : ''} · ${fmtTime(s.duration)} · ${fmtSize(s.size)}${s.pos > 5 ? ' · resume at ' + fmtTime(s.pos) : ''}</div>
+        <div class="sub">${esc(s.artist)}${s.album ? ' · ' + esc(s.album) : ''} · ${fmtTime(s.duration)} · ${fmtSize(s.size)}${s.pos > 5 ? ' · resume at ' + fmtTime(s.pos) : ''}${s.plays ? ' · ' + s.plays + (s.plays === 1 ? ' play' : ' plays') : ''}</div>
       </div>
       <button class="fav ${state.favorites.has(s.id) ? 'on' : ''}" data-fav="${esc(s.id)}" aria-label="Favorite">${icon(state.favorites.has(s.id) ? 'heartFill' : 'heart')}</button>
       <button class="dots" data-menu="${esc(s.id)}" aria-label="More">${icon('dots')}</button>
@@ -1511,7 +1544,7 @@ function render() {
  * variables and the waveform via peakColor(). Saved between launches. */
 const THEMES = ['green', 'miku', 'sonic', 'shadow', 'space', 'soundcloud', 'cdj', 'vapor', 'vinyl'];
 const THEME_NAMES = { green: 'Localify', miku: 'Hatsune Miku', sonic: 'Sonic', shadow: 'Shadow', space: 'Space', soundcloud: 'SoundCloud', cdj: 'CDJ', vapor: 'Vaporwave', vinyl: 'Vinyl' };
-const BUILD = '5.9.5';
+const BUILD = '5.10';
 let peakColorCache = {};
 function applyTheme(name, save = true) {
   state.theme = THEMES.includes(name) ? name : 'green';
@@ -1560,13 +1593,16 @@ function peakColor(p) {
 /* Songs imported before waveforms existed get theirs computed lazily
    the first time they play (WAV only, sampled — see computeWavPeaks). */
 async function ensurePeaks(song, file) {
-  if ((song.peaks && song.peaks.length >= 480) || song._peaksBusy) return;
+  const hasPeaks = !!(song.peaks && song.peaks.length >= 480);
+  const hasRms = !!(song.rms && song.rms.length >= 480);
+  if ((hasPeaks && hasRms) || song._peaksBusy) return;
   if (!/\.wav$/i.test(song.fileName || '')) return;
   song._peaksBusy = true;
   try {
-    const peaks = await peaksForFile(file);
-    if (peaks) {
-      song.peaks = peaks;
+    const wp = await peaksForFile(file);
+    if (wp) {
+      if (!hasPeaks) song.peaks = wp.peaks;
+      if (!hasRms) song.rms = wp.rms;
       DB.put('tracks', song).catch(() => {});
       if (song.id === state.currentId) drawWave();
     }
@@ -1609,6 +1645,7 @@ async function playSong(id, queue) {
   if (currentUrl) { URL.revokeObjectURL(currentUrl); currentUrl = null; }
   currentUrl = URL.createObjectURL(file);   /* native streaming playback; the file is never copied into JS memory */
   state.currentId = id;
+  waveZoom = 1; waveZoomC = 0.5;
   audio.src = currentUrl;
   applyRate();
   /* Resume where this song left off (long mixes!). One-shot listener,
@@ -1624,7 +1661,19 @@ async function playSong(id, queue) {
     audio.addEventListener('loadedmetadata', onMeta);
   }
   audio.play().catch(() => {});
+  song.plays = (song.plays || 0) + 1;
+  song.lastPlayed = Date.now();
+  DB.put('tracks', song).catch(() => {});
   ensurePeaks(song, file);
+  if (!song.bpm && /\.wav$/i.test(song.fileName || '')) {
+    detectBpm(song, file).then((b) => {
+      if (b && !song.bpm) {
+        song.bpm = b;
+        DB.put('tracks', song).catch(() => {});
+        if (song.id === state.currentId) { renderDance(); toast('BPM detected: ' + b); }
+      }
+    }).catch(() => {});
+  }
   saveMeta(); render(); updatePlayerUI();
 }
 
@@ -1709,10 +1758,20 @@ function ensureScrollData(s, ct) {
   if (!s || !/\.wav$/i.test(s.fileName || '')) return;
   if (scrollCache.id !== s.id) scrollCache = { id: s.id, start: 0, dur: 40, fine: null, busy: false, gen: scrollCache.gen + 1 };
   const c = scrollCache;
-  if (c.busy) return;
+  if (c.busy) {
+    /* A window is already computing. Keep it only if it (or the fine
+       data on screen) covers the playhead; a far seek abandons it via
+       the generation counter — its checks discard the result — and the
+       right window starts now instead of after the stale one. */
+    if (c.fine && c.start <= ct && ct <= c.start + c.dur) return;
+    const want0 = Math.max(0, Math.floor((ct - 16) / 4) * 4);
+    if (c.pendingStart != null && Math.abs(want0 - c.pendingStart) <= 20) return;
+    c.gen++;
+  }
   if (c.fine && c.start <= ct - 13 && ct <= c.start + c.dur - 4) return;
   c.busy = true;
   const gen = c.gen;
+  c.pendingStart = Math.max(0, Math.floor((ct - 16) / 4) * 4);
   (async () => {
     try {
       const file = await getPlayableFile(s);
@@ -1912,13 +1971,98 @@ function stageSyncDom(show) {
   artEl.style.display = show ? 'none' : '';
   partwrapEl.classList.toggle('stage-ring', want === 'ring');
 }
+function drawParticles(ctx, W, H, dpr, pal, energies, ct) {
+  const palArr = [pal.low, pal.mid, pal.high];
+  const cx = W / 2, cy = H / 2;
+  const maxR = Math.min(W, H) / 2 - 6 * dpr;
+  for (let i = 0; i < 110; i++) {
+    const band = i % 3;
+    const e = energies[band] || 0;
+    const seed = Math.sin(i * 127.1) * 43758.5453;
+    const frac = seed - Math.floor(seed);
+    const ang = i * 2.39996 + ct * (0.05 + frac * 0.12) * (band === 0 ? 0.6 : 1);
+    const rad = maxR * (0.15 + 0.8 * frac) * (0.82 + 0.28 * e);
+    const x = cx + Math.cos(ang) * rad;
+    const y = cy + Math.sin(ang * 1.31 + frac * 6.2832) * rad * 0.82;
+    const r = (1.1 + frac * 2.2 + e * 3.4) * dpr;
+    ctx.globalAlpha = 0.25 + 0.75 * Math.min(1, e + 0.15);
+    ctx.fillStyle = palArr[band];
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, 6.2832);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+/* Standby stage for the moments a sampler window is not ready (song
+   skip, seek, first load): the chosen style, drawn from the song's
+   overview loudness around the playhead so the stage keeps moving
+   with the music instead of flashing back to the artwork. */
+function drawStageStandby(style, ctx, W, H, dpr, s, ct, pal) {
+  const dur = (s && s.duration) || 0;
+  const pk = (s && s.peaks && s.peaks.length) ? s.peaks : null;
+  const pos = dur > 0 ? Math.min(1, Math.max(0, ct / dur)) : 0;
+  const lvl = pk ? interpArr(pk, pos * (pk.length - 1)) : 0.25;
+  const accent = THEME_ACCENT[state.theme] || '#1ed760';
+  if (style === 'particles') {
+    drawParticles(ctx, W, H, dpr, pal, [lvl, lvl * 0.72, lvl * 0.45], ct);
+    return;
+  }
+  if (style === 'ring') {
+    const cx = W / 2, cy = H / 2;
+    const baseR = Math.min(W, H) * 0.30;
+    ctx.lineWidth = 2 * dpr;
+    ctx.strokeStyle = bandColorAt(pal, 0.2 + 0.6 * lvl);
+    for (let i = 0; i < 48; i++) {
+      const a0 = (i / 48) * Math.PI * 2;
+      const wob = 0.75 + 0.25 * Math.sin(a0 * 3 + ct * 1.7) * Math.cos(a0 * 5 - ct * 1.1);
+      const r = baseR * (0.55 + 0.65 * lvl) * wob;
+      ctx.beginPath();
+      ctx.moveTo(cx + Math.cos(a0) * r * 0.9, cy + Math.sin(a0) * r * 0.9);
+      ctx.lineTo(cx + Math.cos(a0) * r, cy + Math.sin(a0) * r);
+      ctx.stroke();
+    }
+    return;
+  }
+  if (style === 'scope') {
+    const midY = H / 2;
+    const steps = Math.max(48, Math.floor(W / (2 * dpr)));
+    ctx.strokeStyle = accent;
+    ctx.lineWidth = 2 * dpr;
+    ctx.beginPath();
+    for (let i = 0; i <= steps; i++) {
+      const f = pos - (1 - i / steps) * 0.012;
+      const v = pk ? interpArr(pk, Math.max(0, f) * (pk.length - 1)) : 0.2;
+      const x = (i / steps) * W;
+      const y = midY - v * (midY - 4 * dpr);
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,.10)';
+    ctx.fillRect(0, midY, W, Math.max(1, dpr));
+    return;
+  }
+  /* spectrum + mirror: recent-loudness bars from the overview */
+  const NB2 = 24;
+  const bw = W / NB2;
+  const midY = H / 2;
+  for (let b = 0; b < NB2; b++) {
+    const back = (NB2 - 1 - b) * 2;
+    const v = pk ? interpArr(pk, Math.max(0, pos * (pk.length - 1) - back)) : 0.2;
+    if (v < 0.02) continue;
+    const bh = Math.max(2 * dpr, v * ((style === 'mirror' ? H / 2 : H) - 6 * dpr));
+    ctx.fillStyle = bandColorAt(pal, v);
+    if (style === 'mirror') ctx.fillRect(b * bw + bw * 0.14, midY - bh, bw * 0.72, bh * 2);
+    else ctx.fillRect(b * bw + bw * 0.14, H - bh, bw * 0.72, bh);
+  }
+  if (style === 'mirror') { ctx.fillStyle = 'rgba(255,255,255,.14)'; ctx.fillRect(0, midY - Math.max(1, dpr) / 2, W, Math.max(1, dpr)); }
+}
 function drawStage() {
   const style = state.stageStyle || 'art';
   if (style === 'art' || !stageCv) { stageSyncDom(false); return; }
   const s = currentSong(); if (!s) { stageSyncDom(false); return; }
   const c = scrollCache, ct = audio.currentTime || 0;
   const fine = (c.fine && c.id === s.id && ct >= c.start && ct <= c.start + c.dur) ? c.fine : null;
-  if (!fine || !fine.spec || !fine.spec.data) { stageSyncDom(false); return; }
+  const haveReal = !!fine && (style === 'scope' ? !!fine.peaks : !!(fine.spec && fine.spec.data));
   /* Show FIRST, measure second: the canvas is display:none until the
      stage is on, and a hidden element measures 0x0 — measuring first
      made drawStage bail every frame and the stage never appeared
@@ -1931,9 +2075,19 @@ function drawStage() {
   const H = Math.round(rect.height * dpr);
   if (stageCv.width !== W || stageCv.height !== H) { stageCv.width = W; stageCv.height = H; }
   const ctx = stageCv.getContext('2d');
-  ctx.clearRect(0, 0, W, H);
-  const NB = fine.spec.bands;
   const pal = THEME_BANDS[state.theme] || THEME_BANDS.green;
+  if (!haveReal) {
+    /* No sampler window for this position yet (song skip, seek, first
+       load): keep the stage alive on a standby picture drawn from the
+       song's overall loudness instead of flashing back to the artwork.
+       Waterfall just fades its last frame toward black. */
+    if (style === 'waterfall') { ctx.fillStyle = 'rgba(5,7,12,.18)'; ctx.fillRect(0, 0, W, H); return; }
+    ctx.clearRect(0, 0, W, H);
+    drawStageStandby(style, ctx, W, H, dpr, s, ct, pal);
+    return;
+  }
+  ctx.clearRect(0, 0, W, H);
+  const NB = fine.spec ? fine.spec.bands : 24;
   if (stagePkFor !== c.id) { stagePk.fill(0); stagePkHold.fill(0); stagePkFor = c.id; }
   if (style === 'waterfall') {
     ctx.fillStyle = '#05070c';
@@ -2006,7 +2160,78 @@ function drawStage() {
     ctx.scale(1, -0.30);
     bar(true);
     ctx.restore();
+  } else if (style === 'mirror') {
+    const midY = H / 2;
+    const bw2 = W / NB;
+    ctx.fillStyle = 'rgba(255,255,255,.14)';
+    ctx.fillRect(0, midY - Math.max(1, dpr) / 2, W, Math.max(1, dpr));
+    for (let b = 0; b < NB; b++) {
+      const v = specSm[b];
+      if (v < 0.02) continue;
+      const bh = Math.max(2 * dpr, v * (H / 2 - 6 * dpr));
+      ctx.fillStyle = bandColorAt(pal, v);
+      ctx.fillRect(b * bw2 + bw2 * 0.14, midY - bh, bw2 * 0.72, bh * 2);
+    }
+  } else if (style === 'scope') {
+    /* A real oscilloscope trace: the sampler keeps the signed extreme
+       sample per bucket (fine.wave), so the line crosses the axis like
+       a waveform instead of spiking one way off the peaks. A 3-tap
+       smoothing in bucket space keeps it fluid at this zoom. Windows
+       sampled before 5.10 have no wave data — those draw the peaks as
+       a mirrored silhouette until the window refreshes. */
+    const accent = THEME_ACCENT[state.theme] || '#1ed760';
+    const srcArr = fine.wave || fine.peaks;
+    const signed = !!fine.wave;
+    const buckets = srcArr.length;
+    const span = 3;
+    const t1 = ct, t0 = Math.max(c.start, t1 - span);
+    const steps = Math.max(48, Math.floor(W / (2 * dpr)));
+    const midY = H / 2;
+    const valAt = (t) => {
+      const pos = ((t - c.start) / c.dur) * buckets;
+      return (interpArr(srcArr, pos - 1) + interpArr(srcArr, pos) * 2 + interpArr(srcArr, pos + 1)) / 4;
+    };
+    const trace = (sign) => {
+      ctx.beginPath();
+      for (let i = 0; i <= steps; i++) {
+        const t = t0 + (t1 - t0) * (i / steps);
+        let v = valAt(t);
+        if (!signed) v = Math.abs(v);
+        v = Math.max(-1, Math.min(1, v * sign));
+        const x = (i / steps) * W;
+        const y = midY - v * (midY - 4 * dpr);
+        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    };
+    ctx.strokeStyle = accent;
+    ctx.lineWidth = 2 * dpr;
+    ctx.shadowColor = accent;
+    ctx.shadowBlur = 8 * dpr;
+    trace(1);
+    if (!signed) { ctx.shadowBlur = 0; ctx.globalAlpha = 0.45; trace(-1); ctx.globalAlpha = 1; }
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = 'rgba(255,255,255,.10)';
+    ctx.fillRect(0, midY, W, Math.max(1, dpr));
+  } else if (style === 'particles') {
+    drawParticles(ctx, W, H, dpr, pal, [specSm[1] || 0, specSm[8] || 0, specSm[18] || 0], ct);
   }
+}
+let waveZoom = 1, waveZoomC = 0.5;
+function waveView() {
+  const z = waveZoom > 1 ? waveZoom : 1;
+  const w = 1 / z;
+  let v0 = Math.min(Math.max(waveZoomC - w / 2, 0), 1 - w);
+  if (z === 1) v0 = 0;
+  return { v0, v1: v0 + w };
+}
+function setWaveZoom(z, frac, midF) {
+  waveZoom = Math.min(16, Math.max(1, z));
+  if (waveZoom === 1) { waveZoomC = 0.5; drawWave(); return; }
+  const w = 1 / waveZoom;
+  const v0 = Math.min(Math.max(frac - midF * w, 0), 1 - w);
+  waveZoomC = v0 + w / 2;
+  drawWave();
 }
 function drawWave() {
   drawCycle++;
@@ -2027,12 +2252,20 @@ function drawWave() {
      dense thin bars, the played part coloured by each bar's loudness and
      the unplayed part grey. WAVs use their real sampled peaks; other
      formats use their seeded per-song wave sampled into bars. */
-  let disp = s.peaks;
-  if (!disp || !disp.length) {
-    disp = [];
+  let src = s.peaks;
+  if (state.waveMode === 'rms' && s.rms && s.rms.length) src = s.rms.map((v) => Math.min(1, v * 1.5));
+  if (!src || !src.length) {
+    src = [];
     const seedText = s.id + '|' + (s.title || '');
-    for (let i = 0; i < 240; i++) disp.push(ribbonAmp(seedText, i / 240, 0));
+    for (let i = 0; i < 240; i++) src.push(ribbonAmp(seedText, i / 240, 0));
   }
+  const view = waveView();
+  let disp = src;
+  if (waveZoom > 1) {
+    disp = new Array(480);
+    for (let i = 0; i < 480; i++) disp[i] = interpArr(src, (view.v0 + ((i + 0.5) / 480) * (view.v1 - view.v0)) * (src.length - 1));
+  }
+  const vf = (f - view.v0) / (view.v1 - view.v0);
   const n = disp.length, bw = W / n;
   const REST = WAVE_REST[state.theme] || '#3d4a63';
   /* Animation while playing (rests when paused), the v4.3 behaviour
@@ -2042,7 +2275,7 @@ function drawWave() {
      travelling ripple across the played region is gone; the scrolling
      strip below now carries the wider motion.) */
   const playingNow = !audio.paused && !audio.ended;
-  const playBucket = f * n;
+  const playBucket = vf * n;
   const targetLevel = playingNow ? Math.max(0.12, disp[Math.min(n - 1, Math.floor(playBucket))] || 0) : 0;
   waveLevel += (targetLevel - waveLevel) * (playingNow ? 0.4 : 0.15);
   const nowMs = performance.now();
@@ -2058,7 +2291,7 @@ function drawWave() {
         bh = Math.min(H - 2 * dpr, bh * (1 + boost * 0.9));
       }
     }
-    ctx.fillStyle = (i / n <= f) ? peakColor(p) : REST;
+    ctx.fillStyle = (i / n <= vf) ? peakColor(p) : REST;
     ctx.fillRect(i * bw + bw * 0.18, mid - bh / 2, Math.max(1, bw * 0.6), bh);
   }
   if (s.cues && s.cues.length) {
@@ -2066,14 +2299,36 @@ function drawWave() {
     if (durT) {
       ctx.fillStyle = peakColor(0.95);
       for (const cu of s.cues) {
-        const x = Math.round((cu.t / durT) * W);
+        const cf = cu.t / durT;
+        if (cf < view.v0 || cf > view.v1) continue;
+        const x = Math.round(((cf - view.v0) / (view.v1 - view.v0)) * W);
         ctx.fillRect(x - dpr, 0, 2 * dpr, 6 * dpr);
         ctx.fillRect(x - dpr, H - 6 * dpr, 2 * dpr, 6 * dpr);
+      }
+      if (s.beatOffset != null && (s.bpmExact || s.bpm)) {
+        /* Beat ticks along the bottom, taller on bar starts. Capped:
+           a 2-hour mix at full view would need tens of thousands. */
+        const T = 60 / (s.bpmExact || songBpm(s));
+        const tA = view.v0 * durT, tB = view.v1 * durT;
+        if ((tB - tA) / T <= 900) {
+          ctx.fillStyle = '#ffffff';
+          const k0 = Math.ceil((tA - s.beatOffset) / T);
+          for (let k = k0; ; k++) {
+            const t = s.beatOffset + k * T;
+            if (t > tB) break;
+            const x = Math.round(((t / durT - view.v0) / (view.v1 - view.v0)) * W);
+            const barStart = ((k % 4) + 4) % 4 === 0;
+            ctx.globalAlpha = barStart ? 0.5 : 0.22;
+            const th = (barStart ? 9 : 6) * dpr;
+            ctx.fillRect(x, H - th, Math.max(1, dpr), th);
+          }
+          ctx.globalAlpha = 1;
+        }
       }
     }
   }
   ctx.fillStyle = 'rgba(255,255,255,.9)';
-  ctx.fillRect(Math.max(0, Math.round(f * W) - dpr), 2 * dpr, 2 * dpr, H - 4 * dpr);
+  if (vf >= 0 && vf <= 1) ctx.fillRect(Math.max(0, Math.round(vf * W) - dpr), 2 * dpr, 2 * dpr, H - 4 * dpr);
   drawScroll(s, f, disp);
   drawStage();
   drawDancer();
@@ -2222,7 +2477,8 @@ function drawDancer() {
   let i = 0, j = 0, fade = 0, hop = 0, sway = 0;
   const playing = !audio.paused && !audio.ended;
   if (playing) {
-    const beats = audio.currentTime * songBpm(s) / 60;
+    const bpmUse = (s.bpmExact && s.beatOffset != null) ? s.bpmExact : songBpm(s);
+    const beats = Math.max(0, audio.currentTime - (s.beatOffset || 0)) * bpmUse / 60;
     /* One full turn per bar (4 beats), the poses sharing it evenly. */
     const f = ((beats / 4) % 1) * seq.length;
     i = Math.floor(f) % seq.length;
@@ -2263,6 +2519,132 @@ function drawDancer() {
   ctx.restore();
 }
 dancerImg.addEventListener('load', () => { dancerFrameKey = ''; drawDancer(); });
+/* ================= auto BPM + beatgrid (5.10, WAV only) =================
+ * Ported from the Windows fork's streaming path: an energy envelope is
+ * read in pages from about 5% into the song (never a whole-file decode),
+ * tempo comes from autocorrelation of the onset flux, and the beatgrid
+ * phase comes from a joint period/phase search over the same flux. */
+function bpmFromEnvelope(env, hopSec) {
+  const n = env.length;
+  if (n < 300) return 0;
+  const flux = new Float32Array(n);
+  for (let i = 1; i < n; i++) flux[i] = Math.max(0, env[i] - env[i - 1]);
+  const minLag = Math.max(20, Math.floor((60 / 200) / hopSec));
+  const maxLag = Math.min(n - 1, Math.ceil((60 / 60) / hopSec));
+  let best = 0, bestScore = 0;
+  for (let lag = minLag; lag <= maxLag; lag++) {
+    let acc = 0;
+    for (let i = lag; i < n; i++) acc += flux[i] * flux[i - lag];
+    const score = acc / (n - lag);
+    if (score > bestScore) { bestScore = score; best = lag; }
+  }
+  if (!best || bestScore <= 0) return 0;
+  const raw = 60 / (best * hopSec);
+  const cands = [raw / 2, raw, raw * 2].filter((x) => x >= 55 && x <= 210);
+  if (!cands.length) return Math.round(raw);
+  cands.sort((a, b) => Math.abs(a - 145) - Math.abs(b - 145));
+  return Math.round(cands[0]);
+}
+async function wavEnergyEnvelope(r, info, maxSec) {
+  const bits = info.bitsPerSample || 0;
+  const fmt = info.audioFormat || 1;
+  if (!((fmt === 1 && (bits === 8 || bits === 16 || bits === 24 || bits === 32)) || (fmt === 3 && bits === 32))) return null;
+  const bps = bits / 8;
+  const ch = Math.max(1, Math.round(info.blockAlign / bps));
+  const sr = info.sampleRate;
+  const totalFrames = Math.floor(info.dataLen / info.blockAlign);
+  const hop = Math.max(1, Math.round(sr * 0.01));
+  const startFrame = Math.floor(totalFrames * 0.05);
+  const endFrame = Math.min(totalFrames, startFrame + Math.floor(sr * maxSec));
+  if (endFrame - startFrame < hop * 300) return null;
+  const count = Math.floor((endFrame - startFrame) / hop);
+  const env = new Float32Array(count);
+  const dv = (buf) => new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+  const sampleAt = (view, buf, o) => {
+    if (fmt === 3) return view.getFloat32(o, true);
+    if (bits === 16) return view.getInt16(o, true) / 32768;
+    if (bits === 8) return (buf[o] - 128) / 128;
+    if (bits === 24) { let x = buf[o] | (buf[o + 1] << 8) | (buf[o + 2] << 16); if (x & 0x800000) x -= 0x1000000; return x / 8388608; }
+    return view.getInt32(o, true) / 2147483648;
+  };
+  const CHUNK = 262144;
+  let hopIdx = 0, sq = 0, sqN = 0, framePos = startFrame;
+  while (framePos < endFrame && hopIdx < count) {
+    const nFr = Math.min(CHUNK, endFrame - framePos);
+    const buf = await r.read(info.dataStart + framePos * info.blockAlign, nFr * info.blockAlign);
+    const got = Math.floor(buf.length / info.blockAlign);
+    if (!got) break;
+    const view = dv(buf);
+    for (let fr = 0; fr < got && hopIdx < count; fr++) {
+      let acc = 0;
+      const base = fr * info.blockAlign;
+      for (let c = 0; c < ch; c++) acc += sampleAt(view, buf, base + c * bps);
+      const mono = acc / ch;
+      if (((framePos + fr - startFrame) & 3) === 0) { sq += mono * mono; sqN++; }
+      if (((framePos + fr - startFrame + 1) % hop) === 0) {
+        env[hopIdx++] = Math.sqrt(sq / Math.max(1, sqN));
+        sq = 0; sqN = 0;
+      }
+    }
+    framePos += got;
+    await tick();
+  }
+  return { values: env, hopSec: hop / sr, startSec: startFrame / sr };
+}
+/* Joint (period, phase) search over the onset flux: a tag that says 150
+   when the track is really 150.4 would drift the grid a full beat over
+   a long song, so the winner stores bpmExact alongside beatOffset. */
+function beatPhaseFromEnvelope(env, hopSec, bpm, segStart) {
+  /* env may be the envelope object or its values array; a typed array
+     has a values() METHOD, so only an object-typed .values counts. */
+  const src = (env && env.values && typeof env.values === 'object') ? env.values : env;
+  if (!src || !src.length || !bpm) return null;
+  const flux = new Float32Array(src.length);
+  for (let i = 1; i < src.length; i++) flux[i] = Math.max(0, src[i] - src[i - 1]);
+  let best = null;
+  for (let mult = 0.985; mult <= 1.0151; mult += 0.0025) {
+    const T = (60 / bpm) * mult, step = T / hopSec;
+    const steps = Math.max(8, Math.round(step));
+    for (let p = 0; p < steps; p++) {
+      let sc = 0, n = 0;
+      for (let t = p; t < flux.length; t += step) { sc += flux[Math.round(t)] || 0; n++; }
+      if (n && (!best || sc / n > best.score)) best = { score: sc / n, phase: p * hopSec, period: T };
+    }
+  }
+  if (!best) return null;
+  const off = (segStart + best.phase) % best.period;
+  return { beatOffset: Math.round(off * 1000) / 1000, bpmExact: Math.round((60 / best.period) * 100) / 100 };
+}
+async function detectBpm(song, file) {
+  if (!song || song._bpmBusy) return 0;
+  if (!/\.wav$/i.test(song.fileName || '')) return 0;
+  song._bpmBusy = true;
+  try {
+    const f2 = file || await getPlayableFile(song);
+    if (!f2) return 0;
+    const r = new SliceReader(f2);
+    const info = await parseWav(r);
+    if (!info || !info.dataStart) return 0;
+    const env = await wavEnergyEnvelope(r, info, 150);
+    if (!env) return 0;
+    const bpm = bpmFromEnvelope(env.values, env.hopSec);
+    if (bpm) {
+      const ph = beatPhaseFromEnvelope(env.values, env.hopSec, bpm, env.startSec || 0);
+      if (ph) { song.beatOffset = ph.beatOffset; song.bpmExact = ph.bpmExact; }
+    }
+    return bpm;
+  } catch (e) { return 0; }
+  finally { song._bpmBusy = false; }
+}
+$('#bpm-auto').addEventListener('click', async () => {
+  const s = currentSong(); if (!s) { toast('Play a song first'); return; }
+  if (!/\.wav$/i.test(s.fileName || '')) { toast('Auto BPM works on WAV files'); return; }
+  toast('Measuring BPM…');
+  const b = await detectBpm(s, null);
+  if (b) { setBpm(b, true); toast('BPM detected: ' + b); }
+  else toast('No steady BPM found in this song');
+});
+
 function renderDance() {
   const val = $('#bpm-val'); if (!val) return;
   const s = currentSong();
@@ -2274,10 +2656,11 @@ function renderDance() {
   document.querySelectorAll('#dance-chips [data-bpm-preset]').forEach((ch) =>
     ch.classList.toggle('on', custom && Number(ch.dataset.bpmPreset) === songBpm(s)));
 }
-function setBpm(v) {
+function setBpm(v, keepGrid) {
   const s = currentSong();
   if (!s) { toast('Play a song first, then set its BPM'); return; }
   s.bpm = Math.min(200, Math.max(40, Math.round(v * 10) / 10));
+  if (!keepGrid) { delete s.beatOffset; delete s.bpmExact; }
   DB.put('tracks', s).catch(() => {});
   renderDance(); dancerFrameKey = ''; drawDancer();
 }
@@ -2317,7 +2700,8 @@ window.addEventListener('resize', () => {
 let waveSeeking = false;
 function waveSeekTo(e) {
   const r = waveCv.getBoundingClientRect();
-  const f = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
+  const view = waveView();
+  const f = view.v0 + Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)) * (view.v1 - view.v0);
   if (isFinite(audio.duration) && audio.duration) {
     audio.currentTime = f * audio.duration;
     $('#p-cur').textContent = fmtTime(audio.currentTime);
@@ -2328,6 +2712,43 @@ waveCv.addEventListener('pointerdown', (e) => { waveSeeking = true; try { waveCv
 waveCv.addEventListener('pointermove', (e) => { if (waveSeeking) waveSeekTo(e); });
 waveCv.addEventListener('pointerup', () => { waveSeeking = false; });
 waveCv.addEventListener('pointercancel', () => { waveSeeking = false; });
+/* Pinch to zoom the waveform (to 16x, around the pinch centre);
+   double-tap resets. A pinch is not a seek. */
+const wavePointers = new Map();
+let pinchStart = null, lastWaveTap = 0;
+waveCv.addEventListener('pointerdown', (e) => {
+  wavePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (wavePointers.size === 2) {
+    const pts = [...wavePointers.values()];
+    pinchStart = { d: Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y), zoom: waveZoom };
+    waveSeeking = false;
+  } else if (wavePointers.size === 1) {
+    const now = performance.now();
+    if (now - lastWaveTap < 350 && waveZoom > 1) { waveZoom = 1; waveZoomC = 0.5; drawWave(); }
+    lastWaveTap = now;
+  }
+});
+waveCv.addEventListener('pointermove', (e) => {
+  if (!wavePointers.has(e.pointerId)) return;
+  wavePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (pinchStart && wavePointers.size === 2) {
+    const pts = [...wavePointers.values()];
+    const d = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+    if (d > 10 && pinchStart.d > 10) {
+      const r = waveCv.getBoundingClientRect();
+      const midF = Math.min(1, Math.max(0, ((pts[0].x + pts[1].x) / 2 - r.left) / r.width));
+      const view = waveView();
+      const frac = view.v0 + midF * (view.v1 - view.v0);
+      setWaveZoom(pinchStart.zoom * d / pinchStart.d, frac, midF);
+    }
+  }
+});
+const wavePointerEnd = (e) => {
+  wavePointers.delete(e.pointerId);
+  if (wavePointers.size < 2) pinchStart = null;
+};
+waveCv.addEventListener('pointerup', wavePointerEnd);
+waveCv.addEventListener('pointercancel', wavePointerEnd);
 
 /* ================= player UI ================= */
 function updatePlayerUI() {
@@ -2407,6 +2828,50 @@ async function removeSong(id) {
   toast('Removed “' + s.title + '” (your original file in Files is untouched)');
 }
 
+/* ================= duplicates (5.10) =================
+ * Fingerprint = FNV-1a over a sample of the overview peaks plus the
+ * rounded duration: a renamed copy of the same audio still matches.
+ * Songs without peaks (never analysed) are skipped, not guessed. */
+function songFingerprint(s) {
+  if (!s || !s.peaks || !s.peaks.length) return null;
+  let h = 2166136261;
+  const step = Math.max(1, Math.floor(s.peaks.length / 64));
+  for (let i = 0; i < s.peaks.length; i += step) { h ^= Math.round((s.peaks[i] || 0) * 255); h = Math.imul(h, 16777619); }
+  return Math.round(s.duration || 0) + ':' + (h >>> 0).toString(16);
+}
+function openDuplicates() {
+  const groups = new Map();
+  for (const s of state.songs) {
+    const fp = songFingerprint(s);
+    if (!fp) continue;
+    if (!groups.has(fp)) groups.set(fp, []);
+    groups.get(fp).push(s);
+  }
+  const dupes = [...groups.values()].filter((g) => g.length > 1);
+  sheetSongId = null;
+  if (!dupes.length) {
+    $('#sheet').innerHTML = `<h3>Duplicates</h3>
+      <p class="sheetnote">No duplicate songs found. Songs are matched by their audio shape, so a renamed copy still counts. Songs without a waveform yet are not compared.</p>
+      <button data-dupclose="1">Close</button>`;
+  } else {
+    let wasted = 0;
+    const rows = dupes.map((g) => {
+      wasted += g.slice(1).reduce((a, s) => a + (s.size || 0), 0);
+      return g.map((s) => `<div class="duprow"><div class="dupmeta"><b>${esc(s.title)}</b><span>${esc(s.artist)} · ${fmtTime(s.duration)} · ${fmtSize(s.size)}</span></div><button data-dupremove="${esc(s.id)}">Remove</button></div>`).join('');
+    }).join('<div class="dupsep"></div>');
+    $('#sheet').innerHTML = `<h3>Duplicates</h3>
+      <p class="sheetnote">${dupes.length} group${dupes.length === 1 ? '' : 's'} · removing the extra copies frees about ${fmtSize(wasted)}. Keep one of each.</p>
+      ${rows}
+      <button data-dupclose="1">Close</button>`;
+  }
+  $('#sheetWrap').classList.remove('hidden');
+}
+$('#sheetWrap').addEventListener('click', async (e) => {
+  const rm = e.target.closest('[data-dupremove]');
+  if (rm) { await removeSong(rm.dataset.dupremove); openDuplicates(); return; }
+  if (e.target.closest('[data-dupclose]')) closeMenu();
+});
+
 /* ================= events ================= */
 /* Fill the static buttons with SVG icons (they ship as empty shells). */
 const FILL_ICONS = {
@@ -2438,6 +2903,7 @@ $('#chips').addEventListener('click', (e) => {
   if (k === '__newpl') { showPlForm(); return; }
   if (k === '__backup') { exportBackup(); return; }
   if (k === '__restore') { $('#backup-input').click(); return; }
+  if (k === '__dup') { openDuplicates(); return; }
   state.filter = k; render();
 });
 
@@ -2503,7 +2969,15 @@ function renderCues() {
 function addCue() {
   const s = currentSong(); if (!s) return;
   if (!isFinite(audio.duration) || !audio.duration) { toast('Play something first, then mark it'); return; }
-  const t = Math.round(audio.currentTime * 10) / 10;
+  let tRaw = audio.currentTime;
+  if (s.beatOffset != null && (s.bpmExact || s.bpm)) {
+    /* Snap the RAW playhead to the grid (before the 0.1 s cue rounding,
+       which would otherwise eat most of the 60 ms snap window). */
+    const T = 60 / (s.bpmExact || songBpm(s));
+    const snapped = s.beatOffset + Math.round((tRaw - s.beatOffset) / T) * T;
+    if (Math.abs(snapped - tRaw) <= 0.06) tRaw = snapped;
+  }
+  const t = Math.round(tRaw * 10) / 10;
   if (!Array.isArray(s.cues)) s.cues = [];
   if (s.cues.some((cu) => Math.abs(cu.t - t) < 2)) { toast('There is already a cue near ' + fmtTime(t)); return; }
   s.cues.push({ t, label: '' });
@@ -2576,8 +3050,24 @@ function applyWaveStyle() {
     ch.classList.toggle('on', ch.dataset.wave === st));
   const h = WAVE_HEIGHTS[st] || '54px';
   if (scrollCv && waveHeightApplied !== h) { scrollCv.style.height = h; waveHeightApplied = h; }
+  applyWaveShape();
+}
+function applyWaveShape() {
+  const sh = document.querySelector('#wave-chips [data-waveshape]');
+  if (!sh) return;
+  const rms = state.waveMode === 'rms';
+  sh.textContent = rms ? 'Shape: RMS' : 'Shape: Peaks';
+  sh.classList.toggle('on', rms);
 }
 $('#wave-chips').addEventListener('click', (e) => {
+  const shb = e.target.closest('[data-waveshape]');
+  if (shb) {
+    state.waveMode = state.waveMode === 'rms' ? 'peaks' : 'rms';
+    saveMeta(); applyWaveShape();
+    if (!$('#player').classList.contains('hidden')) drawWave();
+    toast(state.waveMode === 'rms' ? 'Waveform shape: RMS (average level)' : 'Waveform shape: Peaks');
+    return;
+  }
   const b = e.target.closest('[data-wave]'); if (!b) return;
   state.waveStyle = b.dataset.wave;
   saveMeta(); applyWaveStyle();
@@ -2715,6 +3205,7 @@ window.addEventListener('drop', (e) => { e.preventDefault(); importFiles(e.dataT
     } catch (error) { console.warn('Stored audio could not be listed', error); }
     for (const t of tracks) {
       if (!t || !t.id) continue;
+      delete t._bpmBusy; delete t._peaksBusy;
       t.persisted = audioKeys.has(t.audioKey) || fileKeys.has(t.id);
       /* A non-persisted record has no file until it is re-picked. */
       t.needsFile = !t.persisted;
