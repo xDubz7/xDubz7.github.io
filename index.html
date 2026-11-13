@@ -311,7 +311,8 @@ main{padding:12px 12px calc(120px + var(--sab))}
 @keyframes bgDrift{from{transform:translateX(-240px)}to{transform:translateX(110vw)}}
 @keyframes bgTwinkle{0%,100%{opacity:.2}50%{opacity:.95}}
 @keyframes bgSway{0%,100%{transform:rotate(-7deg)}50%{transform:rotate(7deg)}}
-@keyframes bgWander{0%{transform:translate(0,0)}33%{transform:translate(44vw,10vh)}66%{transform:translate(10vw,52vh)}100%{transform:translate(52vw,38vh)}}
+@keyframes bgDvdX{from{transform:translateX(0)}to{transform:translateX(calc(100vw - 158px))}}
+@keyframes bgDvdY{from{transform:translateY(0)}to{transform:translateY(calc(100dvh - 148px))}}
 @keyframes bgPulse{0%,100%{opacity:.25}50%{opacity:.9}}
 @keyframes bgBreathe{0%,100%{opacity:.55;transform:scale(1)}50%{opacity:1;transform:scale(1.08)}}
 @keyframes bgEq{0%,100%{transform:scaleY(.18)}50%{transform:scaleY(1)}}
@@ -342,8 +343,8 @@ main{padding:12px 12px calc(120px + var(--sab))}
 /* Miku: teal + pink glow, a checkered field of leeks and notes drifting diagonally, sparkles */
 .bgpat{left:-140px;top:-140px;right:0;bottom:0;opacity:.34;background-repeat:repeat;background-size:140px 140px;animation:bgDiag 16s linear infinite}
 .bgl-miku .wash{background:radial-gradient(60% 36% at 0 100%,rgba(57,197,187,.26),transparent 70%),radial-gradient(55% 32% at 100% 8%,rgba(255,77,157,.20),transparent 70%),radial-gradient(40% 20% at 60% 60%,rgba(57,197,187,.07),transparent 70%);animation:bgBreathe 9s ease-in-out infinite}
-.bgm01{left:4%;top:6%;opacity:.14;animation:bgWander 30s ease-in-out infinite alternate}
-.bgm01 img{width:150px;display:block}
+.bgm01{left:0;top:0;opacity:.14;animation:bgDvdX 9.4s linear infinite alternate}
+.bgm01 img{width:150px;display:block;animation:bgDvdY 6.9s linear infinite alternate}
 .bgspark{color:#9ff3ec;animation:bgTwinkle 2.8s ease-in-out infinite}
 
 /* Sonic: speed streaks, checkered hill, spinning rings */
@@ -374,10 +375,9 @@ main{padding:12px 12px calc(120px + var(--sab))}
 
 /* SoundCloud: sunset glow, drifting clouds, orange waveform */
 .bgl-soundcloud .wash{background:radial-gradient(80% 42% at 50% 106%,rgba(255,85,0,.34),transparent 72%),radial-gradient(60% 30% at 100% 0,rgba(255,140,60,.10),transparent 70%)}
-.bgcloud{left:0;width:130px;height:38px;border-radius:999px;background:#fff;animation:bgDrift linear infinite}
-.bgcloud:before,.bgcloud:after{content:'';position:absolute;background:#fff;border-radius:50%}
-.bgcloud:before{width:60px;height:60px;top:-28px;left:18px}
-.bgcloud:after{width:40px;height:40px;top:-18px;right:18px}
+.bgcloud{left:0;display:flex;align-items:flex-end;gap:3px;animation:bgDrift linear infinite}
+.bgcloud:before{content:'';position:absolute;right:-2px;bottom:0;width:56%;height:82%;background:#fff;border-radius:999px 999px 14px 14px}
+.bgcloud i{position:relative;flex:1;background:#fff;border-radius:3px;height:var(--h,50%)}
 .bgrays{left:50%;bottom:-60vw;width:120vw;height:120vw;margin-left:-60vw;border-radius:50%;opacity:.55;background:repeating-conic-gradient(from 0deg,rgba(255,120,40,.20) 0 6deg,transparent 6deg 18deg);-webkit-mask-image:radial-gradient(circle,#000 0,transparent 62%);mask-image:radial-gradient(circle,#000 0,transparent 62%);animation:bgRays 90s linear infinite}
 .bgscsun{left:50%;bottom:-17vw;width:34vw;height:34vw;max-width:260px;max-height:260px;min-width:170px;min-height:170px;margin-left:calc(-1 * clamp(85px,17vw,130px));border-radius:50%;background:radial-gradient(circle at 50% 40%,#ffb27a,#ff5500 62%,#c43a00);box-shadow:0 0 70px rgba(255,85,0,.55);animation:bgBreathe 8s ease-in-out infinite}
 
@@ -542,10 +542,10 @@ main{padding:12px 12px calc(120px + var(--sab))}
     <div class="wash"></div>
     <div class="bgrays"></div>
     <div class="bgscsun"></div>
-    <div class="bgcloud" style="top:8%;opacity:.13;animation-duration:52s"></div>
-    <div class="bgcloud" style="top:24%;width:88px;height:26px;opacity:.08;animation-duration:74s;animation-delay:-30s"></div>
-    <div class="bgcloud" style="top:44%;width:170px;height:48px;opacity:.09;animation-duration:96s;animation-delay:-58s"></div>
-    <div class="bgcloud" style="top:62%;width:110px;height:32px;opacity:.07;animation-duration:64s;animation-delay:-12s"></div>
+    <div class="bgcloud" style="top:8%;width:150px;height:48px;opacity:.13;animation-duration:52s"><i style="--h:16%"></i><i style="--h:24%"></i><i style="--h:20%"></i><i style="--h:34%"></i><i style="--h:28%"></i><i style="--h:42%"></i><i style="--h:50%"></i><i style="--h:45%"></i><i style="--h:58%"></i><i style="--h:70%"></i><i style="--h:84%"></i><i style="--h:94%"></i><i style="--h:100%"></i><i style="--h:96%"></i><i style="--h:88%"></i><i style="--h:72%"></i><i style="--h:54%"></i><i style="--h:36%"></i></div>
+    <div class="bgcloud" style="top:24%;width:96px;height:30px;opacity:.08;animation-duration:74s;animation-delay:-30s"><i style="--h:16%"></i><i style="--h:24%"></i><i style="--h:20%"></i><i style="--h:34%"></i><i style="--h:28%"></i><i style="--h:42%"></i><i style="--h:50%"></i><i style="--h:45%"></i><i style="--h:58%"></i><i style="--h:70%"></i><i style="--h:84%"></i><i style="--h:94%"></i><i style="--h:100%"></i><i style="--h:96%"></i><i style="--h:88%"></i><i style="--h:72%"></i><i style="--h:54%"></i><i style="--h:36%"></i></div>
+    <div class="bgcloud" style="top:44%;width:200px;height:64px;opacity:.09;animation-duration:96s;animation-delay:-58s"><i style="--h:16%"></i><i style="--h:24%"></i><i style="--h:20%"></i><i style="--h:34%"></i><i style="--h:28%"></i><i style="--h:42%"></i><i style="--h:50%"></i><i style="--h:45%"></i><i style="--h:58%"></i><i style="--h:70%"></i><i style="--h:84%"></i><i style="--h:94%"></i><i style="--h:100%"></i><i style="--h:96%"></i><i style="--h:88%"></i><i style="--h:72%"></i><i style="--h:54%"></i><i style="--h:36%"></i></div>
+    <div class="bgcloud" style="top:62%;width:120px;height:38px;opacity:.07;animation-duration:64s;animation-delay:-12s"><i style="--h:16%"></i><i style="--h:24%"></i><i style="--h:20%"></i><i style="--h:34%"></i><i style="--h:28%"></i><i style="--h:42%"></i><i style="--h:50%"></i><i style="--h:45%"></i><i style="--h:58%"></i><i style="--h:70%"></i><i style="--h:84%"></i><i style="--h:94%"></i><i style="--h:100%"></i><i style="--h:96%"></i><i style="--h:88%"></i><i style="--h:72%"></i><i style="--h:54%"></i><i style="--h:36%"></i></div>
   </div>
   <div class="bglayer bgl-cdj">
     <div class="wash"></div>
@@ -868,6 +868,10 @@ document.addEventListener('pointerdown', () => {
    repeats for that version. Add an entry here for every release
    that ships user-visible changes. */
 const CHANGELOG = {
+  '5.11': [
+    'Miku: the 01 logo now bounces around the player like the DVD screensaver logo, edge to edge',
+    'SoundCloud: the drifting clouds are waveform clouds now, shaped like the SoundCloud mark — bars growing into a cloud',
+  ],
   '5.10.2': [
     'Fixed: Scope is the desktop waveform line again — 5.10.1 turned it into a block envelope, the wrong call. Scope now draws only the real signed wave, and a window without wave data shows the standby instead of falling back to peaks',
   ],
@@ -1550,7 +1554,7 @@ function render() {
  * variables and the waveform via peakColor(). Saved between launches. */
 const THEMES = ['green', 'miku', 'sonic', 'shadow', 'space', 'soundcloud', 'cdj', 'vapor', 'vinyl'];
 const THEME_NAMES = { green: 'Localify', miku: 'Hatsune Miku', sonic: 'Sonic', shadow: 'Shadow', space: 'Space', soundcloud: 'SoundCloud', cdj: 'CDJ', vapor: 'Vaporwave', vinyl: 'Vinyl' };
-const BUILD = '5.10.2';
+const BUILD = '5.11';
 let peakColorCache = {};
 function applyTheme(name, save = true) {
   state.theme = THEMES.includes(name) ? name : 'green';
