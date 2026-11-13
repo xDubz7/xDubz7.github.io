@@ -844,6 +844,9 @@ document.addEventListener('pointerdown', () => {
    repeats for that version. Add an entry here for every release
    that ships user-visible changes. */
 const CHANGELOG = {
+  '5.9.4': [
+    'Improved: the dancers turn at one steady speed (no more stall twice a bar), blend smoothly between poses, hop with a squash-and-stretch landing on every beat, stand on a soft shadow and glow in the theme colour',
+  ],
   '5.9.3': [
     'New: the wandering 01 on the Miku theme is now the real logo artwork, barcode and all',
     'Backgrounds reshuffled: Localify trades its equalizer for ripples and rising orbs, SoundCloud gets a rotating ray fan and a glowing sun, and the Miku leeks are now a drifting checkered pattern',
@@ -1493,7 +1496,7 @@ function render() {
  * variables and the waveform via peakColor(). Saved between launches. */
 const THEMES = ['green', 'miku', 'sonic', 'shadow', 'space', 'soundcloud', 'cdj', 'vapor', 'vinyl'];
 const THEME_NAMES = { green: 'Localify', miku: 'Hatsune Miku', sonic: 'Sonic', shadow: 'Shadow', space: 'Space', soundcloud: 'SoundCloud', cdj: 'CDJ', vapor: 'Vaporwave', vinyl: 'Vinyl' };
-const BUILD = '5.9.3';
+const BUILD = '5.9.4';
 let peakColorCache = {};
 function applyTheme(name, save = true) {
   state.theme = THEMES.includes(name) ? name : 'green';
@@ -2164,6 +2167,34 @@ function songBpm(s) {
   const b = Number(s && s.bpm);
   return b >= 40 && b <= 200 ? b : DANCER_DEFAULT_BPM;
 }
+/* 5.9.4 dancer pass.
+ * - Smoother loop: the sheet's strips hold near-duplicate poses (frame
+ *   7 repeats frame 0 on most rows, and three rows repeat their back
+ *   frame), which showed up as a stall twice per bar. Those frames are
+ *   skipped now (DANCER_SKIP) and the remaining poses share the bar
+ *   evenly, so the turn keeps one steady speed.
+ * - Between poses the next one fades in over the last part of each
+ *   step, so the spin reads as motion instead of a slideshow.
+ * - Hop with squash and stretch on every beat, anchored at her feet,
+ *   a contact shadow that shrinks as she jumps, and a soft glow in the
+ *   theme colour so she separates from the artwork.
+ * Still a pure function of currentTime and BPM: no audio graph. */
+const DANCER_SKIP = { 0: [7], 1: [7], 2: [4, 7], 3: [4, 7], 4: [7], 5: [4, 7], 6: [], 7: [7], 8: [7] };
+const DANCER_SEQ = {};
+for (let r = 0; r < DANCER_ROWS; r++) {
+  DANCER_SEQ[r] = [];
+  for (let c = 0; c < DANCER_COLS; c++) if (!(DANCER_SKIP[r] || []).includes(c)) DANCER_SEQ[r].push(c);
+}
+let dancerGlowTheme = '', dancerGlow = 'rgba(30,215,96,.55)';
+function dancerGlowColor() {
+  if (dancerGlowTheme === state.theme) return dancerGlow;
+  dancerGlowTheme = state.theme;
+  const v = (getComputedStyle(document.documentElement).getPropertyValue('--green') || '').trim();
+  const m = /^#([0-9a-f]{6})$/i.exec(v);
+  dancerGlow = m ? 'rgba(' + [0, 2, 4].map((i) => parseInt(m[1].substr(i, 2), 16)).join(',') + ',.6)' : 'rgba(255,255,255,.35)';
+  return dancerGlow;
+}
+const smooth01 = (x) => { x = Math.min(1, Math.max(0, x)); return x * x * (3 - 2 * x); };
 function drawDancer() {
   if (!dancerCv) return;
   const s = currentSong();
@@ -2172,29 +2203,48 @@ function drawDancer() {
   dancerCv.style.height = Math.round(96 * (DANCER_ZOOM[state.theme] ?? 1)) + 'px';
   if (!show || !dancerImg.complete || !dancerImg.naturalWidth) return;
   const row = DANCER_ROW_FOR_THEME[state.theme] ?? 1;
-  let frame = 0, bob = 0, sway = 0;
+  const seq = DANCER_SEQ[row];
+  let i = 0, j = 0, fade = 0, hop = 0, sway = 0;
   const playing = !audio.paused && !audio.ended;
   if (playing) {
     const beats = audio.currentTime * songBpm(s) / 60;
-    /* The one kept move: the spin, turning one way at 2 frames per
-       beat so a full turn takes exactly one bar. */
-    frame = Math.floor(beats * 2) % DANCER_COLS;
-    /* Continuous motion between poses: a hop on every beat and a slow
-       sway, both pure functions of the beat so they can never drift. */
-    bob = -Math.abs(Math.sin(beats * Math.PI)) * dancerCv.height * 0.03;
-    sway = Math.sin(beats * Math.PI / 2) * 0.025;
+    /* One full turn per bar (4 beats), the poses sharing it evenly. */
+    const f = ((beats / 4) % 1) * seq.length;
+    i = Math.floor(f) % seq.length;
+    j = (i + 1) % seq.length;
+    fade = smooth01((f - Math.floor(f) - 0.7) / 0.3);
+    hop = Math.abs(Math.sin(beats * Math.PI));
+    sway = Math.sin(beats * Math.PI / 2) * 0.03;
   }
-  const key = row + ':' + frame + ':' + Math.round(bob * 2) + ':' + Math.round(sway * 200) + ':' + playing;
+  const key = row + ':' + i + ':' + Math.round(fade * 12) + ':' + Math.round(hop * 24) + ':' + Math.round(sway * 300) + ':' + playing;
   if (key === dancerFrameKey) return;
   dancerFrameKey = key;
+  const W = dancerCv.width, H = dancerCv.height;
   const ctx = dancerCv.getContext('2d');
-  ctx.clearRect(0, 0, dancerCv.width, dancerCv.height);
+  ctx.clearRect(0, 0, W, H);
+  ctx.imageSmoothingQuality = 'high';
+  /* contact shadow: widest and darkest when she lands */
+  ctx.fillStyle = 'rgba(0,0,0,' + (0.34 - 0.2 * hop).toFixed(3) + ')';
+  ctx.beginPath();
+  ctx.ellipse(W / 2, H * 0.958, W * (0.25 - 0.07 * hop), H * 0.02, 0, 0, Math.PI * 2);
+  ctx.fill();
+  /* hop with squash (landing) and stretch (apex), pivoting on her feet */
+  const sy = 1 - 0.05 * Math.pow(1 - hop, 3) + 0.03 * hop;
+  const sx = 1 / Math.pow(sy, 0.6);
+  const lift = -hop * H * 0.05;
   ctx.save();
-  ctx.translate(dancerCv.width / 2, dancerCv.height);
+  ctx.translate(W / 2, H * 0.955);
   ctx.rotate(sway);
-  ctx.translate(-dancerCv.width / 2, -dancerCv.height + bob);
-  ctx.drawImage(dancerImg, frame * DANCER_CW, row * DANCER_CH, DANCER_CW, DANCER_CH,
-    0, 0, dancerCv.width, dancerCv.height);
+  ctx.scale(sx, sy);
+  ctx.translate(-W / 2, -H * 0.955 + lift);
+  ctx.shadowColor = dancerGlowColor();
+  ctx.shadowBlur = 14;
+  const draw = (c, a) => {
+    ctx.globalAlpha = a;
+    ctx.drawImage(dancerImg, seq[c] * DANCER_CW, row * DANCER_CH, DANCER_CW, DANCER_CH, 0, 0, W, H);
+  };
+  draw(i, 1);
+  if (fade > 0.02) { ctx.shadowBlur = 0; draw(j, fade); }
   ctx.restore();
 }
 dancerImg.addEventListener('load', () => { dancerFrameKey = ''; drawDancer(); });
