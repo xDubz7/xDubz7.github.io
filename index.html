@@ -868,6 +868,9 @@ document.addEventListener('pointerdown', () => {
    repeats for that version. Add an entry here for every release
    that ships user-visible changes. */
 const CHANGELOG = {
+  '5.10.2': [
+    'Fixed: Scope is the desktop waveform line again — 5.10.1 turned it into a block envelope, the wrong call. Scope now draws only the real signed wave, and a window without wave data shows the standby instead of falling back to peaks',
+  ],
   '5.10.1': [
     'Fixed: Scope jumped around as spikes on bass-heavy tracks (the moving peaks) — it now draws the true min-to-max shape of the wave in each bucket, so it flows like a real waveform',
   ],
@@ -1192,9 +1195,8 @@ async function computeFinePeaks(r, info, t0, t1, buckets) {
   const endFrame = Math.min(totalFrames, Math.ceil(t1 * sr));
   const out = new Float32Array(buckets);
   const wv = new Float32Array(buckets);
-  const wMin = new Float32Array(buckets).fill(Infinity), wMax = new Float32Array(buckets).fill(-Infinity);
   const bLow = new Float32Array(buckets), bMid = new Float32Array(buckets), bHigh = new Float32Array(buckets);
-  if (endFrame <= startFrame) return { peaks: out, wave: wv, wmin: new Float32Array(buckets), wmax: new Float32Array(buckets), low: bLow, mid: bMid, high: bHigh, spec: null };
+  if (endFrame <= startFrame) return { peaks: out, wave: wv, low: bLow, mid: bMid, high: bHigh, spec: null };
   /* Cheap 3-band split riding the same decode pass: two one-pole
      low-passes (250 Hz / 4 kHz). low = lp250, mid = lp4k - lp250,
      high = signal - lp4k. No FFT, no extra reads. */
@@ -1255,8 +1257,6 @@ async function computeFinePeaks(r, info, t0, t1, buckets) {
       const b = Math.min(buckets - 1, Math.floor((framePos + fr - startFrame) / perBucket));
       if (v > out[b]) out[b] = v;
       if (v > Math.abs(wv[b])) wv[b] = mono;
-      if (mono < wMin[b]) wMin[b] = mono;
-      if (mono > wMax[b]) wMax[b] = mono;
       lp1 += a1 * (mono - lp1);
       lp2 += a2 * (mono - lp2);
       const lv = Math.abs(lp1), mv = Math.abs(lp2 - lp1), hv = Math.abs(mono - lp2);
@@ -1281,8 +1281,7 @@ async function computeFinePeaks(r, info, t0, t1, buckets) {
       spec = { bands: SPEC_BANDS, sliceDur: sliceEvery / sr, data };
     }
   }
-  for (let b = 0; b < buckets; b++) if (!isFinite(wMin[b])) { wMin[b] = 0; wMax[b] = 0; }
-  return { peaks: out, wave: wv, wmin: wMin, wmax: wMax, low: bLow, mid: bMid, high: bHigh, spec };
+  return { peaks: out, wave: wv, low: bLow, mid: bMid, high: bHigh, spec };
 }
 
 async function peaksForFile(file) {
@@ -1551,7 +1550,7 @@ function render() {
  * variables and the waveform via peakColor(). Saved between launches. */
 const THEMES = ['green', 'miku', 'sonic', 'shadow', 'space', 'soundcloud', 'cdj', 'vapor', 'vinyl'];
 const THEME_NAMES = { green: 'Localify', miku: 'Hatsune Miku', sonic: 'Sonic', shadow: 'Shadow', space: 'Space', soundcloud: 'SoundCloud', cdj: 'CDJ', vapor: 'Vaporwave', vinyl: 'Vinyl' };
-const BUILD = '5.10.1';
+const BUILD = '5.10.2';
 let peakColorCache = {};
 function applyTheme(name, save = true) {
   state.theme = THEMES.includes(name) ? name : 'green';
@@ -2069,7 +2068,7 @@ function drawStage() {
   const s = currentSong(); if (!s) { stageSyncDom(false); return; }
   const c = scrollCache, ct = audio.currentTime || 0;
   const fine = (c.fine && c.id === s.id && ct >= c.start && ct <= c.start + c.dur) ? c.fine : null;
-  const haveReal = !!fine && (style === 'scope' ? !!fine.peaks : !!(fine.spec && fine.spec.data));
+  const haveReal = !!fine && (style === 'scope' ? !!fine.wave : !!(fine.spec && fine.spec.data));
   /* Show FIRST, measure second: the canvas is display:none until the
      stage is on, and a hidden element measures 0x0 — measuring first
      made drawStage bail every frame and the stage never appeared
@@ -2180,38 +2179,18 @@ function drawStage() {
       ctx.fillRect(b * bw2 + bw2 * 0.14, midY - bh, bw2 * 0.72, bh * 2);
     }
   } else if (style === 'scope') {
-    /* The wave's true shape: the sampler keeps the min AND max sample
-       of every bucket, and each bucket draws as a vertical span
-       between them. 5.10 drew a single line through the signed
-       extreme per bucket instead — on bass-heavy tracks that extreme
-       flips sign bucket to bucket with the sub's phase, so the line
-       zigzagged full-height and the peaks jumped around while
-       scrolling (Gabriel's 'moving peaks'). Windows sampled before
-       5.10.1 have no min/max — those fall back to the line trace. */
+    /* The desktop Scope (W1.5): a line over the signed waveform —
+       fine.wave, the signed extreme sample per bucket — with a 3-tap
+       smoothing, glowing in the theme accent. Scope NEVER draws
+       peaks: drawing unsigned peaks was the original desktop bug
+       (W1.4, 'glitching at its peaks'), it resurfaced on web through
+       this branch's wave-less mirrored-peaks fallback, and 5.10.1
+       then swapped the line for a block envelope, which was also
+       the wrong waveform. The drawStage gate now counts a window
+       without wave data as not-ready (standby), so this branch only
+       ever runs on the real wave. */
     const accent = THEME_ACCENT[state.theme] || '#1ed760';
-    if (fine.wmin && fine.wmax) {
-      const buckets = fine.wmin.length;
-      const span = 3;
-      const t1 = ct, t0 = Math.max(c.start, t1 - span);
-      const b0 = ((t0 - c.start) / c.dur) * buckets, b1 = ((t1 - c.start) / c.dur) * buckets;
-      const cols = Math.max(48, Math.round(b1 - b0));
-      const cw2 = W / cols;
-      const midY = H / 2, amp = midY - 4 * dpr;
-      ctx.fillStyle = accent;
-      ctx.globalAlpha = 0.9;
-      for (let i = 0; i < cols; i++) {
-        const b = Math.min(buckets - 1, Math.max(0, Math.floor(b0 + (i / cols) * (b1 - b0))));
-        const yT = midY - fine.wmax[b] * amp;
-        const yB = midY - fine.wmin[b] * amp;
-        ctx.fillRect(i * cw2 + cw2 * 0.15, yT, Math.max(1, cw2 * 0.7), Math.max(1.2 * dpr, yB - yT));
-      }
-      ctx.globalAlpha = 1;
-      ctx.fillStyle = 'rgba(255,255,255,.10)';
-      ctx.fillRect(0, midY, W, Math.max(1, dpr));
-      return;
-    }
-    const srcArr = fine.wave || fine.peaks;
-    const signed = !!fine.wave;
+    const srcArr = fine.wave;
     const buckets = srcArr.length;
     const span = 3;
     const t1 = ct, t0 = Math.max(c.start, t1 - span);
@@ -2221,25 +2200,19 @@ function drawStage() {
       const pos = ((t - c.start) / c.dur) * buckets;
       return (interpArr(srcArr, pos - 1) + interpArr(srcArr, pos) * 2 + interpArr(srcArr, pos + 1)) / 4;
     };
-    const trace = (sign) => {
-      ctx.beginPath();
-      for (let i = 0; i <= steps; i++) {
-        const t = t0 + (t1 - t0) * (i / steps);
-        let v = valAt(t);
-        if (!signed) v = Math.abs(v);
-        v = Math.max(-1, Math.min(1, v * sign));
-        const x = (i / steps) * W;
-        const y = midY - v * (midY - 4 * dpr);
-        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-      }
-      ctx.stroke();
-    };
     ctx.strokeStyle = accent;
     ctx.lineWidth = 2 * dpr;
     ctx.shadowColor = accent;
     ctx.shadowBlur = 8 * dpr;
-    trace(1);
-    if (!signed) { ctx.shadowBlur = 0; ctx.globalAlpha = 0.45; trace(-1); ctx.globalAlpha = 1; }
+    ctx.beginPath();
+    for (let i = 0; i <= steps; i++) {
+      const t = t0 + (t1 - t0) * (i / steps);
+      const v = Math.max(-1, Math.min(1, valAt(t)));
+      const x = (i / steps) * W;
+      const y = midY - v * (midY - 4 * dpr);
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
     ctx.shadowBlur = 0;
     ctx.fillStyle = 'rgba(255,255,255,.10)';
     ctx.fillRect(0, midY, W, Math.max(1, dpr));
