@@ -410,14 +410,8 @@ main{padding:12px 12px calc(120px + var(--sab))}
  *     That copies the WHOLE file into RAM, then decodes it to Float32 PCM.
  *     A 1.5 GB WAV decodes to roughly 3 GB of samples — iOS kills the tab.
  *     -> This build never decodes audio in JS. No decodeAudioData, ever.
- *  2. Imports copied the whole file into IndexedDB in one transaction.
- *     Safari will not reliably store a 600 MB–1.5 GB blob for a web page.
- *     -> Files up to PERSIST_LIMIT are stored so they survive a reload.
- *        Larger files are NEVER copied: they play from the File you picked,
- *        for this session, and only their name/artist/duration are saved.
- *        Re-pick the same file later and it re-attaches automatically
- *        (matched by name + size). This is a Safari limit, not a choice:
- *        web pages on iOS get no persistent handle to a file in Files.
+ *  2. Imports now copy audio to OPFS in bounded chunks. IndexedDB
+ *     still holds track metadata and previously stored audio.
  *  3. There is exactly ONE <audio> element and ONE object URL alive at a
  *     time. No standby/crossfade deck pre-loading the next huge file,
  *     no pre-buffering, no hidden copies.
@@ -427,7 +421,8 @@ main{padding:12px 12px calc(120px + var(--sab))}
  *  (data size in a ds64 chunk) are handled too.
  */
 
-const PERSIST_LIMIT = 700 * 1024 * 1024; /* 700 MB: at/above this, session-only. Was 150 MB until 5.4.0 — Gabriel's trial raise (2026-11-12) so his ~600 MB WAVs persist too; the 1.5 GB mix stays session-only, and if iOS refuses a store the import catch falls back to session-only. */
+const COPY_CHUNK_BYTES = 4 * 1024 * 1024;
+const LEGACY_BLOB_LIMIT = 700 * 1024 * 1024;
 const AUDIO_EXT = /\.(mp3|flac|wav|ogg|oga|m4a|aac|opus|wma|webm|aif|aiff)$/i;
 const $ = (s) => document.querySelector(s);
 const audio = $('#audio');
@@ -455,7 +450,7 @@ function icon(name) {
   return '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">' + (ICON_INNER[name] || '') + '</svg>';
 }
 
-/* ================= storage (metadata + small files only) ================= */
+/* ================= storage ================= */
 const DB = (() => {
   let p = null;
   function open() {
@@ -476,14 +471,58 @@ const DB = (() => {
   }
   const wrap = (r) => new Promise((res, rej) => { r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
   async function store(name, mode) { const db = await open(); return db.transaction(name, mode).objectStore(name); }
+  async function write(name, operation) {
+    const db = await open();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(name, 'readwrite');
+      tx.oncomplete = () => resolve();
+      tx.onabort = () => reject(tx.error);
+      operation(tx.objectStore(name));
+    });
+  }
   return {
     get:    async (n, k) => wrap((await store(n, 'readonly')).get(k)),
     getAll: async (n)    => wrap((await store(n, 'readonly')).getAll()),
     keys:   async (n)    => wrap((await store(n, 'readonly')).getAllKeys()),
-    put:    async (n, v) => wrap((await store(n, 'readwrite')).put(v)),
-    del:    async (n, k) => wrap((await store(n, 'readwrite')).delete(k)),
+    put:    async (n, v) => write(n, (os) => os.put(v)),
+    del:    async (n, k) => write(n, (os) => os.delete(k)),
   };
 })();
+
+async function audioDirectory(create = false) {
+  const root = await navigator.storage.getDirectory();
+  return root.getDirectoryHandle('localify-audio', { create });
+}
+
+async function copyAudio(file) {
+  const directory = await audioDirectory(true);
+  const key = crypto.randomUUID();
+  let writer;
+  try {
+    const handle = await directory.getFileHandle(key, { create: true });
+    writer = await handle.createWritable();
+    for (let offset = 0; offset < file.size; offset += COPY_CHUNK_BYTES) {
+      const end = Math.min(file.size, offset + COPY_CHUNK_BYTES);
+      await writer.write(await file.slice(offset, end).arrayBuffer());
+      if (state.importing) {
+        state.importing.fileProgress = end / file.size;
+        renderImport();
+      }
+    }
+    await writer.close();
+    return key;
+  } catch (error) {
+    if (writer) await writer.abort().catch(() => {});
+    await directory.removeEntry(key).catch(() => {});
+    throw error;
+  }
+}
+
+async function removeStoredAudio(key) {
+  if (!key) return;
+  const directory = await audioDirectory();
+  await directory.removeEntry(key);
+}
 
 /* ================= state ================= */
 const state = {
@@ -575,6 +614,10 @@ document.addEventListener('pointerdown', () => {
    repeats for that version. Add an entry here for every release
    that ships user-visible changes. */
 const CHANGELOG = {
+  '5.7.3': [
+    'Large tracks can now be saved for playback after reloading, subject to available browser storage.',
+    'Re-add an older session-only track once to save its audio and keep its playlist entries.',
+  ],
   '5.7.2': [
     'Fixed: on the Ring stage the dancer stayed in the corner when switching from another stage — she now moves to the middle of the ring',
   ],
@@ -1034,55 +1077,63 @@ function renderImport() {
   const bar = $('#importbar');
   if (!state.importing) { bar.classList.add('hidden'); return; }
   bar.classList.remove('hidden');
-  const { done, total, name } = state.importing;
+  const { done, total, name, fileProgress = 0 } = state.importing;
   $('#ib-name').textContent = 'Adding: ' + (name || '');
   $('#ib-count').textContent = done + ' / ' + total;
-  $('#ib-fill').style.width = (total ? Math.round(done / total * 100) : 0) + '%';
+  $('#ib-fill').style.width = (total ? Math.min(99, Math.round((done + fileProgress) / total * 100)) : 0) + '%';
+}
+
+async function saveTrackAudio(record, file) {
+  let audioKey;
+  let legacyBlob = false;
+  try {
+    if (navigator.storage?.getDirectory && globalThis.FileSystemFileHandle?.prototype.createWritable) {
+      audioKey = await copyAudio(file);
+    } else if (file.size < LEGACY_BLOB_LIMIT) {
+      // Compatibility for browsers without writable OPFS.
+      await DB.put('files', { id: record.id, blob: file });
+      legacyBlob = true;
+    }
+  } catch (error) {
+    console.warn('Audio could not be saved', error);
+  }
+
+  const persisted = Boolean(audioKey || legacyBlob);
+  const updated = { ...record, audioKey, persisted, sessionOnly: !persisted, needsFile: false };
+  try {
+    await DB.put('tracks', updated);
+    Object.assign(record, updated);
+  } catch (error) {
+    await removeStoredAudio(audioKey).catch(() => {});
+    if (legacyBlob) await DB.del('files', record.id).catch(() => {});
+    Object.assign(record, { persisted: false, sessionOnly: true, needsFile: false });
+    console.warn('Track metadata could not be saved', error);
+  }
 }
 
 async function importOneFile(file) {
   const id = fileId(file);
-  /* Re-attach: a saved record (e.g. a session-only large file from a
-     previous visit) with the same name+size gets its file back. */
-  let existing = state.byId.get(id);
-  if (!existing) {
-    existing = state.songs.find((s) => s.needsFile && s.fileName === file.name && s.size === file.size);
-  }
+  const existing = state.byId.get(id) || state.songs.find((song) =>
+    !song.persisted && song.fileName === file.name && song.size === file.size);
   if (existing) {
     sessionFiles.set(existing.id, file);
-    if (existing.needsFile) {
-      existing.needsFile = false;
-      /* If it is small enough to keep after all, store it now. */
-      if (file.size < PERSIST_LIMIT && !existing.persisted) {
-        try { await DB.put('files', { id: existing.id, blob: file }); existing.persisted = true; } catch (e) { /* session-only then */ }
-      }
-      await DB.put('tracks', existing).catch(() => {});
-      render();
-    }
-    return 'attached';
+    if (!existing.persisted) await saveTrackAudio(existing, file);
+    existing.needsFile = false;
+    return existing.persisted ? 'attached' : 'session';
   }
+
   const info = await readTags(file);
-  const large = file.size >= PERSIST_LIMIT;
   const record = {
     id, title: info.title, artist: info.artist, album: info.album,
     duration: info.duration, size: file.size, mime: file.type || '',
     fileName: file.name, addedAt: Date.now(), peaks: info.peaks || null,
-    persisted: false, sessionOnly: large, needsFile: false,
+    persisted: false, sessionOnly: true, needsFile: false,
   };
-  if (!large) {
-    try { await DB.put('files', { id, blob: file }); record.persisted = true; }
-    catch (e) { record.sessionOnly = true; /* storage full/refused: keep it for this session */ }
-  }
+  await saveTrackAudio(record, file);
   sessionFiles.set(id, file);
-  /* Storage must NEVER block an import: on hosts where IndexedDB is
-     unavailable or partitioned (e.g. inside another site's frame), the
-     DB write rejects — the song still plays fine from memory for this
-     session, so a failed write only means "not saved for next visit". */
-  try { await DB.put('tracks', record); }
-  catch (e) { record.sessionOnly = true; console.warn('Track metadata not saved (storage unavailable); playing for this session', e); }
   state.songs.push(record);
   state.byId.set(id, record);
-  return large ? 'large' : 'added';
+  return record.persisted ? 'added' : 'session';
 }
 
 async function importFiles(fileList) {
@@ -1091,25 +1142,24 @@ async function importFiles(fileList) {
   if (state.importing) { toast('Still adding — one moment'); return; }
   state.importing = { done: 0, total: files.length, name: files[0].name };
   renderImport();
-  let added = 0, large = 0, attached = 0, failed = 0;
+  let added = 0, session = 0, attached = 0, failed = 0;
   for (const file of files) {
-    state.importing.name = file.name; renderImport();
+    state.importing.name = file.name; state.importing.fileProgress = 0; renderImport();
     try {
       const out = await importOneFile(file);
-      if (out === 'added') added++; else if (out === 'large') large++;
+      if (out === 'added') added++; else if (out === 'session') session++;
       else if (out === 'attached') attached++;
     } catch (e) { failed++; console.warn('Could not import', file.name, e); }
-    state.importing.done++; renderImport();
+    state.importing.done++; state.importing.fileProgress = 0; renderImport();
     await tick(); /* let Safari breathe between files */
   }
   state.importing = null; renderImport(); render();
   const bits = [];
-  if (added) bits.push(added + ' added');
-  if (large) bits.push(large + ' large file' + (large > 1 ? 's' : '') + ' added for this session');
-  if (attached) bits.push(attached + ' re-attached');
+  if (added) bits.push(added + ' saved on this device');
+  if (session) bits.push(session + ' playable for this session only. Re-add after reload.');
+  if (attached) bits.push(attached + ' linked and saved');
   if (failed) bits.push(failed + ' failed');
   toast(bits.join(' · ') || 'Nothing new to add');
-  if (large) setTimeout(() => toast('Large files (over ' + fmtSize(PERSIST_LIMIT) + ') play for this session only — Safari can’t store them. Re-add the file next visit and it re-attaches.'), 3600);
 }
 
 /* ================= library rendering ================= */
@@ -1151,9 +1201,8 @@ function render() {
     main.innerHTML = `<div class="empty"><div class="big">${icon('note')}</div>
       <b>Your library is empty</b><br>Tap <b>+ Add music</b> and pick songs from Files
       (MP3, FLAC, WAV, M4A…). They play right here — offline, no account, no YouTube.
-      <div class="note"><b>Big WAVs welcome:</b> files over ${fmtSize(PERSIST_LIMIT)} (your 600 MB / 1.5 GB ones)
-      are played directly without being copied into the browser, which is what crashed Safari before.
-      They stay playable until you close the page; re-adding the same file later re-attaches it to its saved entry.</div></div>`;
+      <div class="note">Localify saves audio on this device when browser storage is available.
+      If a file can only play for this session, re-add it later to reconnect it to its library entry.</div></div>`;
     return;
   }
   if (!list.length) {
@@ -1194,7 +1243,7 @@ function render() {
  * variables and the waveform via peakColor(). Saved between launches. */
 const THEMES = ['green', 'miku', 'sonic', 'shadow', 'space', 'soundcloud', 'cdj', 'vapor', 'vinyl'];
 const THEME_NAMES = { green: 'Localify', miku: 'Hatsune Miku', sonic: 'Sonic', shadow: 'Shadow', space: 'Space', soundcloud: 'SoundCloud', cdj: 'CDJ', vapor: 'Vaporwave', vinyl: 'Vinyl' };
-const BUILD = '5.7.2';
+const BUILD = '5.7.3';
 let peakColorCache = {};
 function applyTheme(name, save = true) {
   state.theme = THEMES.includes(name) ? name : 'green';
@@ -1263,6 +1312,14 @@ function currentSong() { return state.byId.get(state.currentId) || null; }
 async function getPlayableFile(song) {
   if (sessionFiles.has(song.id)) return sessionFiles.get(song.id);
   if (!song.persisted) return null;
+  if (song.audioKey) {
+    try {
+      const directory = await audioDirectory();
+      const handle = await directory.getFileHandle(song.audioKey);
+      const file = await handle.getFile();
+      if (file.size === song.size) return song.mime ? file.slice(0, file.size, song.mime) : file;
+    } catch (error) { console.warn('Stored audio could not be opened', error); }
+  }
   const row = await DB.get('files', song.id).catch(() => null);
   if (row && row.blob) { sessionFiles.set(song.id, row.blob); return row.blob; }
   return null;
@@ -1276,8 +1333,8 @@ async function playSong(id, queue) {
   const file = await getPlayableFile(song);
   if (token !== playToken) return;
   if (!file) {
-    song.needsFile = true; render();
-    toast('“' + song.title + '” is a large/session file — tap + Add music and pick it again to play it');
+    song.persisted = false; song.sessionOnly = true; song.needsFile = true; render();
+    toast('“' + song.title + '” needs its audio file — tap + Add music and pick it again to play it');
     $('#file-input').click();
     return;
   }
@@ -2019,6 +2076,7 @@ function openMenu(id) {
 function closeMenu() { $('#sheetWrap').classList.add('hidden'); sheetSongId = null; }
 
 async function removeSong(id) {
+  if (state.importing) { toast('Wait for music to finish importing'); return; }
   const s = state.byId.get(id); if (!s) return;
   if (state.currentId === id) { audio.pause(); audio.removeAttribute('src'); if (currentUrl) { URL.revokeObjectURL(currentUrl); currentUrl = null; } state.currentId = null; }
   sessionFiles.delete(id);
@@ -2028,6 +2086,7 @@ async function removeSong(id) {
   state.playlists.forEach((pl) => { pl.ids = pl.ids.filter((x) => x !== id); });
   await DB.del('tracks', id).catch(() => {});
   await DB.del('files', id).catch(() => {});
+  await removeStoredAudio(s.audioKey).catch(() => {});
   await DB.del('covers', id).catch(() => {});
   saveMeta(); render(); updatePlayerUI();
   toast('Removed “' + s.title + '” (your original file in Files is untouched)');
@@ -2310,18 +2369,27 @@ window.addEventListener('drop', (e) => { e.preventDefault(); importFiles(e.dataT
   try {
     const tracks = await DB.getAll('tracks');
     const fileKeys = new Set(await DB.keys('files').catch(() => []));
+    const audioKeys = new Set();
+    const directory = await audioDirectory().catch(() => null);
+    try {
+      if (directory) {
+        for await (const [key, handle] of directory.entries()) {
+          if (handle.kind === 'file') audioKeys.add(key);
+        }
+      }
+    } catch (error) { console.warn('Stored audio could not be listed', error); }
     for (const t of tracks) {
       if (!t || !t.id) continue;
-      t.persisted = fileKeys.has(t.id);
+      t.persisted = audioKeys.has(t.audioKey) || fileKeys.has(t.id);
       /* A non-persisted record has no file until it is re-picked. */
       t.needsFile = !t.persisted;
-      if (t.needsFile) t.sessionOnly = true;
+      t.sessionOnly = t.needsFile;
       state.songs.push(t); state.byId.set(t.id, t);
     }
   } catch (e) { console.warn('Library load failed', e); }
   render(); updatePlayerUI();
   if (state.songs.some((s) => s.needsFile)) {
-    toast('Some songs (large/session files) need their file re-picked once — tap + Add music and select them again');
+    toast('Some songs need their audio files. Tap + Add music and select the original files again.');
   }
   try {
     if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
