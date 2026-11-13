@@ -184,7 +184,7 @@ main{padding:12px 12px calc(120px + var(--sab))}
 .pbtn.main{background:var(--green);color:#04140a;font-size:19px}
 
 /* ---------- full player ---------- */
-#player{position:fixed;inset:0;z-index:40;background:var(--bg);background:color-mix(in srgb, var(--bg) 88%, transparent);overflow-y:auto;
+#player{position:fixed;inset:0;z-index:40;background:transparent;overflow-y:auto;
   padding:calc(14px + var(--sat)) 22px calc(18px + var(--sab));display:flex;flex-direction:column}
 #player>*{flex-shrink:0}
 #player .close{align-self:flex-start;font-size:26px;color:var(--dim);padding:4px 8px}
@@ -285,12 +285,12 @@ main{padding:12px 12px calc(120px + var(--sab))}
   background:#1c2740;border:1px solid var(--line);color:var(--text);font-size:14px;
   padding:10px 16px;border-radius:999px;max-width:88vw;text-align:center;box-shadow:0 8px 24px rgba(0,0,0,.5)}
 
-/* ================= theme backgrounds (5.9) =================
- * One fixed layer behind the whole player; the visible scene follows
- * data-theme like everything else. Pure CSS transforms/opacity —
- * no JS, no audio anything. Mid strength by design. */
-#bgfx{position:fixed;inset:0;z-index:0;overflow:hidden;pointer-events:none}
-main{position:relative;z-index:1}
+/* ================= theme backgrounds (5.9, player view only per 5.9.1) =================
+ * A fixed layer INSIDE the full player view (the screen with the
+ * dancer and waveform), behind its content; the library stays clean.
+ * The visible scene follows data-theme like everything else. Pure CSS
+ * transforms/opacity — no JS, no audio anything. Mid strength. */
+#bgfx{position:fixed;inset:0;z-index:-1;overflow:hidden;pointer-events:none;background:var(--bg)}
 .bglayer{position:absolute;inset:0;display:none}
 [data-theme="green"] .bgl-green,
 [data-theme="miku"] .bgl-miku,
@@ -345,6 +345,51 @@ main{position:relative;z-index:1}
 </head>
 <body>
 
+<header>
+  <div class="brand">
+    <div class="logo"><svg viewBox="0 0 512 512" width="21" height="21" aria-hidden="true"><g fill="var(--green)"><rect x="76" y="216" width="34" height="80" rx="17"/><rect x="130" y="176" width="34" height="160" rx="17"/><rect x="184" y="126" width="34" height="260" rx="17"/><rect x="238" y="86" width="36" height="340" rx="18"/><rect x="294" y="126" width="34" height="260" rx="17"/><rect x="348" y="176" width="34" height="160" rx="17"/><rect x="402" y="216" width="34" height="80" rx="17"/></g></svg></div>
+    <h1>Localify<small>Local files only</small></h1>
+    <button class="iconbtn" id="btn-theme" aria-label="Switch theme"></button>
+    <button class="addbtn" id="btn-add">+ Add music</button>
+    <button class="addbtn ghost" id="btn-folder">+ Folder</button>
+  </div>
+  <div class="searchrow">
+    <input id="search" type="search" placeholder="Search your library…" autocomplete="off">
+    <select id="sort" aria-label="Sort">
+      <option value="title">Title A–Z</option>
+      <option value="artist">Artist A–Z</option>
+      <option value="recent">Recently added</option>
+      <option value="size-desc">Largest first</option>
+    </select>
+  </div>
+  <div class="chips" id="chips"></div>
+</header>
+
+<div id="whatsnew" class="hidden">
+  <div class="wn-head"><b id="wn-title">What's new</b><button id="wn-close" aria-label="Dismiss">✕</button></div>
+  <ul id="wn-list"></ul>
+</div>
+
+<div id="importbar" class="hidden">
+  <div class="row"><b id="ib-name">Adding music…</b><span id="ib-count">0 / 0</span></div>
+  <div class="track"><i id="ib-fill"></i></div>
+</div>
+
+<main id="main"></main>
+
+<div id="mini" class="hidden">
+  <div class="prog"><i id="mini-prog-fill"></i></div>
+  <div class="art" id="mini-art"></div>
+  <div class="meta" id="mini-meta">
+    <div class="title" id="mini-title">Nothing playing</div>
+    <div class="sub" id="mini-sub">Pick a song to start</div>
+  </div>
+  <button class="pbtn" id="mini-prev" aria-label="Previous"></button>
+  <button class="pbtn main" id="mini-play" aria-label="Play or pause"></button>
+  <button class="pbtn" id="mini-next" aria-label="Next"></button>
+</div>
+
+<div id="player" class="hidden">
 <div id="bgfx" aria-hidden="true">
   <div class="bglayer bgl-green">
     <span class="bgnote" style="left:10%;font-size:30px;color:#1ed760;animation-duration:24s">♪</span>
@@ -395,52 +440,6 @@ main{position:relative;z-index:1}
     <div class="bgdisc" style="width:120px;height:120px;left:-36px;top:5%;animation-duration:9.5s;opacity:.55"></div>
   </div>
 </div>
-
-<header>
-  <div class="brand">
-    <div class="logo"><svg viewBox="0 0 512 512" width="21" height="21" aria-hidden="true"><g fill="var(--green)"><rect x="76" y="216" width="34" height="80" rx="17"/><rect x="130" y="176" width="34" height="160" rx="17"/><rect x="184" y="126" width="34" height="260" rx="17"/><rect x="238" y="86" width="36" height="340" rx="18"/><rect x="294" y="126" width="34" height="260" rx="17"/><rect x="348" y="176" width="34" height="160" rx="17"/><rect x="402" y="216" width="34" height="80" rx="17"/></g></svg></div>
-    <h1>Localify<small>Local files only</small></h1>
-    <button class="iconbtn" id="btn-theme" aria-label="Switch theme"></button>
-    <button class="addbtn" id="btn-add">+ Add music</button>
-    <button class="addbtn ghost" id="btn-folder">+ Folder</button>
-  </div>
-  <div class="searchrow">
-    <input id="search" type="search" placeholder="Search your library…" autocomplete="off">
-    <select id="sort" aria-label="Sort">
-      <option value="title">Title A–Z</option>
-      <option value="artist">Artist A–Z</option>
-      <option value="recent">Recently added</option>
-      <option value="size-desc">Largest first</option>
-    </select>
-  </div>
-  <div class="chips" id="chips"></div>
-</header>
-
-<div id="whatsnew" class="hidden">
-  <div class="wn-head"><b id="wn-title">What's new</b><button id="wn-close" aria-label="Dismiss">✕</button></div>
-  <ul id="wn-list"></ul>
-</div>
-
-<div id="importbar" class="hidden">
-  <div class="row"><b id="ib-name">Adding music…</b><span id="ib-count">0 / 0</span></div>
-  <div class="track"><i id="ib-fill"></i></div>
-</div>
-
-<main id="main"></main>
-
-<div id="mini" class="hidden">
-  <div class="prog"><i id="mini-prog-fill"></i></div>
-  <div class="art" id="mini-art"></div>
-  <div class="meta" id="mini-meta">
-    <div class="title" id="mini-title">Nothing playing</div>
-    <div class="sub" id="mini-sub">Pick a song to start</div>
-  </div>
-  <button class="pbtn" id="mini-prev" aria-label="Previous"></button>
-  <button class="pbtn main" id="mini-play" aria-label="Play or pause"></button>
-  <button class="pbtn" id="mini-next" aria-label="Next"></button>
-</div>
-
-<div id="player" class="hidden">
   <button class="close" id="p-close" aria-label="Close player"></button>
   <div class="partwrap"><canvas id="p-stage"></canvas><div class="part" id="p-art"></div><canvas id="p-dancer" width="330" height="384"></canvas></div>
   <h2 id="p-title">Nothing playing</h2>
@@ -727,6 +726,9 @@ document.addEventListener('pointerdown', () => {
    repeats for that version. Add an entry here for every release
    that ships user-visible changes. */
 const CHANGELOG = {
+  '5.9.1': [
+    'Fixed: the theme backgrounds now live in the full player view (with the dancer and waveform), not in the library — the library is back to clean',
+  ],
   '5.9': [
     'New: every theme gets an animated background across the whole player — spinning, bouncing rings for Sonic and Shadow, a drifting cloud for SoundCloud, turning records for Vinyl, leeks and a wandering 01 for Miku, stars, a planet and a galaxy for Space, plus matching scenes for Localify, CDJ and Vaporwave',
   ],
@@ -1366,7 +1368,7 @@ function render() {
  * variables and the waveform via peakColor(). Saved between launches. */
 const THEMES = ['green', 'miku', 'sonic', 'shadow', 'space', 'soundcloud', 'cdj', 'vapor', 'vinyl'];
 const THEME_NAMES = { green: 'Localify', miku: 'Hatsune Miku', sonic: 'Sonic', shadow: 'Shadow', space: 'Space', soundcloud: 'SoundCloud', cdj: 'CDJ', vapor: 'Vaporwave', vinyl: 'Vinyl' };
-const BUILD = '5.9';
+const BUILD = '5.9.1';
 let peakColorCache = {};
 function applyTheme(name, save = true) {
   state.theme = THEMES.includes(name) ? name : 'green';
