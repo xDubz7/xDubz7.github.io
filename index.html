@@ -808,7 +808,6 @@ let wantPlay = false;
 let interrupted = false;
 let interruptPos = 0;
 let lastReviveAt = 0;
-let reviveFails = 0;
 
 function saveMeta() {
   DB.put('meta', { key: 'app', value: {
@@ -877,6 +876,9 @@ document.addEventListener('pointerdown', () => {
    repeats for that version. Add an entry here for every release
    that ships user-visible changes. */
 const CHANGELOG = {
+  '5.11.2': [
+    'Fixed: pausing from AirPods or the car and pressing play would not resume — the 5.11.1 recovery reloaded the song while the system was still restoring playback. Recovery now only steps in when a song is provably stuck, and the remote play path is left alone otherwise',
+  ],
   '5.11.1': [
     'Fixed: after an alarm, call or Siri interruption the song would not play or load again — the player now spots the interruption, reloads the song and resumes where it stopped, including when you come back to the app',
   ],
@@ -1566,7 +1568,7 @@ function render() {
  * variables and the waveform via peakColor(). Saved between launches. */
 const THEMES = ['green', 'miku', 'sonic', 'shadow', 'space', 'soundcloud', 'cdj', 'vapor', 'vinyl'];
 const THEME_NAMES = { green: 'Localify', miku: 'Hatsune Miku', sonic: 'Sonic', shadow: 'Shadow', space: 'Space', soundcloud: 'SoundCloud', cdj: 'CDJ', vapor: 'Vaporwave', vinyl: 'Vinyl' };
-const BUILD = '5.11.1';
+const BUILD = '5.11.2';
 let peakColorCache = {};
 function applyTheme(name, save = true) {
   state.theme = THEMES.includes(name) ? name : 'green';
@@ -2969,12 +2971,16 @@ const togglePlay = () => {
   audio.play().catch(() => {});
   /* An iOS interruption can leave the element paused with a dead
      pipeline: play() is accepted but nothing is fetched and the
-     position never moves. Verify the start actually happened; if
-     the song is not playing shortly after, reload its source. */
+     position never moves. Verify the start — but give the system a
+     full 2 s, and only reload the source when the element is
+     provably dead (still paused, position frozen, almost no data).
+     A remote-control resume or a big file still buffering must be
+     left alone: 5.11.1 revived too eagerly there and broke resume
+     from AirPods / car controls entirely. */
   const t0 = audio.currentTime;
   setTimeout(() => {
-    if (wantPlay && !audio.ended && (audio.paused || (audio.currentTime === t0 && audio.readyState < 3))) revivePlayback();
-  }, 900);
+    if (wantPlay && !audio.ended && audio.paused && audio.currentTime === t0 && audio.readyState < 3) revivePlayback();
+  }, 2000);
 };
 $('#mini-play').addEventListener('click', (e) => { e.stopPropagation(); togglePlay(); });
 $('#p-play').addEventListener('click', togglePlay);
@@ -3164,14 +3170,9 @@ audio.addEventListener('pause', () => { savePos(true); updatePlayerUI(); });
  * still wants playback) and revivePlayback() reloads the source
  * and resumes at the interrupted position. A pause the user asked
  * for clears wantPlay first, so recovery never overrides him. */
-audio.addEventListener('play', () => { wantPlay = true; interrupted = false; reviveFails = 0; });
+audio.addEventListener('play', () => { wantPlay = true; interrupted = false; });
 audio.addEventListener('pause', () => {
   if (wantPlay && state.currentId && !audio.ended) { interrupted = true; interruptPos = audio.currentTime || 0; }
-});
-let stallTimer = 0;
-audio.addEventListener('waiting', () => {
-  clearTimeout(stallTimer);
-  stallTimer = setTimeout(() => { if (wantPlay && !audio.ended && audio.readyState < 3) revivePlayback(); }, 2500);
 });
 async function revivePlayback() {
   const s = currentSong();
@@ -3195,22 +3196,25 @@ async function revivePlayback() {
     audio.addEventListener('loadedmetadata', onMeta);
   }
   audio.play().catch(() => {});
-  setTimeout(() => {
-    if (wantPlay && audio.paused && !audio.ended) {
-      reviveFails++;
-      if (reviveFails >= 3) { wantPlay = false; toast('Playback could not restart after the interruption — tap the song to play it again'); }
-      else { lastReviveAt = 0; revivePlayback(); }
-    }
-  }, 1500);
+  /* No retry chain: if this revive does not take, the next play
+     press tries the plain path first again. 5.11.1 retried on a
+     timer and eventually marked playback unwanted — while iOS was
+     still restoring a remote-control resume, that churn was the
+     whole bug. */
 }
 /* Coming back to the app after an interruption resumes the song,
-   like a native player; so does the first touch back in the app. */
+   like a native player: a plain play() first (usually the system
+   just needs the nudge), and a source reload only if the element
+   turns out to be provably dead. */
 document.addEventListener('visibilitychange', () => {
-  if (!document.hidden && interrupted && wantPlay) revivePlayback();
+  if (!document.hidden && interrupted && wantPlay && audio.paused) {
+    const t0 = audio.currentTime;
+    audio.play().catch(() => {});
+    setTimeout(() => {
+      if (wantPlay && !audio.ended && audio.paused && audio.currentTime === t0 && audio.readyState < 3) revivePlayback();
+    }, 2000);
+  }
 });
-window.addEventListener('pointerdown', () => {
-  if (interrupted && wantPlay && audio.paused) revivePlayback();
-}, true);
 audio.addEventListener('ended', () => {
   const s = currentSong();
   if (s && s.pos) { s.pos = 0; DB.put('tracks', s).catch(() => {}); }
