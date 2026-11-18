@@ -266,7 +266,7 @@ main{padding:12px 12px calc(120px + var(--sab))}
 
 /* ---------- sheet / toast ---------- */
 #sheetWrap{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.55);display:flex;align-items:flex-end}
-#sheet{background:var(--panel);width:100%;border-radius:18px 18px 0 0;padding:14px 16px calc(16px + var(--sab))}
+#sheet{background:var(--panel);width:100%;border-radius:18px 18px 0 0;padding:14px 16px calc(16px + var(--sab));max-height:92dvh;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
 #sheet h3{margin:4px 0 10px;font-size:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #sheet button{display:block;width:100%;text-align:left;padding:13px 6px;font-size:15.5px;border-bottom:1px solid var(--line)}
 #sheet button:last-child{border-bottom:0}
@@ -908,6 +908,9 @@ document.addEventListener('pointerdown', () => {
    repeats for that version. Add an entry here for every release
    that ships user-visible changes. */
 const CHANGELOG = {
+  '5.13.1': [
+    'Fixed: the Stats sheet could not be scrolled and its top rows were cut off — sheets are now capped at most of the screen height and scroll properly, which also fixes any other long sheet',
+  ],
   '5.13': [
     'New tracking: listening time per song (only real playback counts, never pauses or seeks), completions and early skips, a play history, and daily totals with a day streak',
     'The Stats sheet grows with it: total listening time, most listened songs, today and the last 7 days, completions vs skips, and your recent play history',
@@ -1612,7 +1615,7 @@ function render() {
  * variables and the waveform via peakColor(). Saved between launches. */
 const THEMES = ['green', 'miku', 'sonic', 'shadow', 'space', 'soundcloud', 'cdj', 'vapor', 'vinyl'];
 const THEME_NAMES = { green: 'Localify', miku: 'Hatsune Miku', sonic: 'Sonic', shadow: 'Shadow', space: 'Space', soundcloud: 'SoundCloud', cdj: 'CDJ', vapor: 'Vaporwave', vinyl: 'Vinyl' };
-const BUILD = '5.13';
+const BUILD = '5.13.1';
 let peakColorCache = {};
 function applyTheme(name, save = true) {
   state.theme = THEMES.includes(name) ? name : 'green';
