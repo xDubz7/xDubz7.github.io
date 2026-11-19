@@ -840,6 +840,16 @@ let wantPlay = false;
 let interrupted = false;
 let interruptPos = 0;
 let lastReviveAt = 0;
+/* 5.17: the dead-element decision is made synchronously inside the
+   play press itself, from these two timestamps — never on a timer.
+   A page suspended behind the lock screen runs no timers, so the
+   5.11.2 verify (setTimeout 2 s) could never fire for a lock-screen,
+   AirPods or car play press, which is exactly where Gabriel hit it:
+   pause in the car or switch apps for a few minutes, iOS tears the
+   media pipeline down, and remote play then did nothing at all
+   until the app was reopened (foreground = timers alive again). */
+let pausedAt = 0;      // when the element last became paused
+let playAttemptAt = 0; // a play() was tried and no 'playing' confirmed it
 
 /* ================= listening stats =================
    listenedSec accrues only while the audio actually advances: the
@@ -934,6 +944,10 @@ document.addEventListener('pointerdown', () => {
    repeats for that version. Add an entry here for every release
    that ships user-visible changes. */
 const CHANGELOG = {
+  '5.17': [
+    'Fixed play not resuming from the lock screen, AirPods or car after the app sat paused a few minutes (switching apps, pausing in the car): the player now checks whether the song pipeline died at the moment you press play and reloads the song on the spot, instead of checking on a timer that cannot run while the phone is locked',
+    'Quick pause-and-resume is untouched — a healthy song still resumes with a plain play, no reload',
+  ],
   '5.16': [
     'Fixed the page zooming in when you double-tap the screen — taps are treated as app controls now, not zoom gestures (the waveform pinch zoom still works, it runs on its own handling)',
     'The search box no longer makes the page jump-zoom when you tap into it',
@@ -1653,7 +1667,7 @@ function render() {
  * variables and the waveform via peakColor(). Saved between launches. */
 const THEMES = ['green', 'miku', 'sonic', 'shadow', 'space', 'soundcloud', 'cdj', 'vapor', 'vinyl', 'dubstep'];
 const THEME_NAMES = { green: 'Localify', miku: 'Hatsune Miku', sonic: 'Sonic', shadow: 'Shadow', space: 'Space', soundcloud: 'SoundCloud', cdj: 'CDJ', vapor: 'Vaporwave', vinyl: 'Vinyl', dubstep: 'Dubstep' };
-const BUILD = '5.16';
+const BUILD = '5.17';
 let peakColorCache = {};
 function applyTheme(name, save = true) {
   state.theme = THEMES.includes(name) ? name : 'green';
@@ -3129,19 +3143,19 @@ const togglePlay = () => {
      its library row does, instead of playing an empty element. */
   if (!currentUrl) { playSong(s.id, visibleSongs()); return; }
   wantPlay = true;
-  audio.play().catch(() => {});
-  /* An iOS interruption can leave the element paused with a dead
-     pipeline: play() is accepted but nothing is fetched and the
-     position never moves. Verify the start — but give the system a
-     full 2 s, and only reload the source when the element is
-     provably dead (still paused, position frozen, almost no data).
-     A remote-control resume or a big file still buffering must be
-     left alone: 5.11.1 revived too eagerly there and broke resume
-     from AirPods / car controls entirely. */
-  const t0 = audio.currentTime;
-  setTimeout(() => {
-    if (wantPlay && !audio.ended && audio.paused && audio.currentTime === t0 && audio.readyState < 3) revivePlayback();
-  }, 2000);
+  /* Dead pipeline? Decide NOW, inside this press (see elementStale):
+     a healthy element takes the plain play() below and is left
+     completely alone — the 5.11.1 lesson — while a stale one is
+     reloaded on the spot, because from the lock screen there may
+     never be a later moment where page code gets to run a check. */
+  if (elementStale(false)) { interruptPos = audio.currentTime || interruptPos; revivePlayback(); return; }
+  playAttemptAt = Date.now();
+  const p = audio.play();
+  if (p && p.catch) p.catch(() => {
+    /* A rejected play() on a wanted, still-paused element is a dead
+       source: reload it right away instead of swallowing the error. */
+    if (wantPlay && audio.paused && state.currentId) { interruptPos = audio.currentTime || interruptPos; revivePlayback(); }
+  });
 };
 $('#mini-play').addEventListener('click', (e) => { e.stopPropagation(); togglePlay(); });
 $('#p-play').addEventListener('click', togglePlay);
@@ -3337,11 +3351,32 @@ audio.addEventListener('pause', () => { savePos(true); updatePlayerUI(); });
  * still wants playback) and revivePlayback() reloads the source
  * and resumes at the interrupted position. A pause the user asked
  * for clears wantPlay first, so recovery never overrides him. */
-audio.addEventListener('play', () => { wantPlay = true; interrupted = false; });
+audio.addEventListener('play', () => { wantPlay = true; interrupted = false; pausedAt = 0; });
+audio.addEventListener('playing', () => { playAttemptAt = 0; });
 audio.addEventListener('pause', () => {
   flushListen();
+  pausedAt = Date.now();
+  playAttemptAt = 0;
   if (wantPlay && state.currentId && !audio.ended) { interrupted = true; interruptPos = audio.currentTime || 0; }
 });
+/* Synchronous dead-element test for a play press. Hard signs (an
+   error, no source, or an earlier play press that never produced a
+   'playing' event) always count. So does a system interruption.
+   And after a long pause (20 s+) with almost no data held, iOS has
+   usually torn the pipeline down while the app sat backgrounded —
+   every song here is a huge WAV, so nothing stays buffered. A quick
+   pause/resume keeps readyState high and a clean slate, so the
+   healthy remote-control path is never revived under it. The
+   foreground variant (app just reopened) skips the interruption
+   sign: being in the foreground rebuilds the session, so a plain
+   play() gets its chance first there. */
+function elementStale(foreground) {
+  if (audio.error || audio.networkState === 3) return true;
+  if (playAttemptAt) return true;
+  if (!foreground && interrupted) return true;
+  if (pausedAt && Date.now() - pausedAt > 20000 && audio.readyState < 3) return true;
+  return false;
+}
 async function revivePlayback() {
   const s = currentSong();
   if (!s || !wantPlay) return;
@@ -3376,11 +3411,9 @@ async function revivePlayback() {
    turns out to be provably dead. */
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden && interrupted && wantPlay && audio.paused) {
-    const t0 = audio.currentTime;
+    if (elementStale(true)) { revivePlayback(); return; }
+    playAttemptAt = Date.now();
     audio.play().catch(() => {});
-    setTimeout(() => {
-      if (wantPlay && !audio.ended && audio.paused && audio.currentTime === t0 && audio.readyState < 3) revivePlayback();
-    }, 2000);
   }
 });
 audio.addEventListener('ended', () => {
