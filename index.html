@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#070a11">
 <meta name="description" content="Localify Local - play your own music files on iPhone, offline. No YouTube, no streaming. Large WAV safe.">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -110,7 +110,7 @@
 [data-theme="miku"] .controls .pbtn.toggled, [data-theme="sonic"] .controls .pbtn.toggled,
 [data-theme="shadow"] .controls .pbtn.toggled, [data-theme="space"] .controls .pbtn.toggled{color:var(--pink)}
 *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
-html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
+html,body{margin:0;padding:0;background:var(--bg);color:var(--text);touch-action:manipulation;
   font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
 button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 input{font:inherit}
@@ -137,7 +137,7 @@ header{position:sticky;top:0;z-index:20;background:rgba(7,10,17,.92);backdrop-fi
 .addbtn.ghost:active{background:var(--panel2)}
 .searchrow{display:flex;gap:8px;margin-top:12px}
 .searchrow input{flex:1;background:var(--panel2);border:1px solid var(--line);color:var(--text);
-  border-radius:999px;padding:9px 14px;outline:none;font-size:15px}
+  border-radius:999px;padding:9px 14px;outline:none;font-size:16px}
 .searchrow select{background:var(--panel2);border:1px solid var(--line);color:var(--text);
   border-radius:999px;padding:0 8px;font-size:13px;max-width:118px}
 .chips{display:flex;gap:8px;margin-top:10px;overflow-x:auto;padding-bottom:2px;scrollbar-width:none}
@@ -934,6 +934,10 @@ document.addEventListener('pointerdown', () => {
    repeats for that version. Add an entry here for every release
    that ships user-visible changes. */
 const CHANGELOG = {
+  '5.16': [
+    'Fixed the page zooming in when you double-tap the screen — taps are treated as app controls now, not zoom gestures (the waveform pinch zoom still works, it runs on its own handling)',
+    'The search box no longer makes the page jump-zoom when you tap into it',
+  ],
   '5.15': [
     'The Dubstep theme gets its own dancer: an original chibi DJ with long violet hair, glowing purple headphones and a black EQ-bars hoodie, spinning in the player and in the middle of the Ring stage',
     'She replaces the borrowed Vaporwave dancer the theme launched with',
@@ -1649,7 +1653,7 @@ function render() {
  * variables and the waveform via peakColor(). Saved between launches. */
 const THEMES = ['green', 'miku', 'sonic', 'shadow', 'space', 'soundcloud', 'cdj', 'vapor', 'vinyl', 'dubstep'];
 const THEME_NAMES = { green: 'Localify', miku: 'Hatsune Miku', sonic: 'Sonic', shadow: 'Shadow', space: 'Space', soundcloud: 'SoundCloud', cdj: 'CDJ', vapor: 'Vaporwave', vinyl: 'Vinyl', dubstep: 'Dubstep' };
-const BUILD = '5.15';
+const BUILD = '5.16';
 let peakColorCache = {};
 function applyTheme(name, save = true) {
   state.theme = THEMES.includes(name) ? name : 'green';
